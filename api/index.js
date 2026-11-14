@@ -11,9 +11,11 @@ let env;
 function getEnv() {
   if (env) return env;
   // يقبل أسماء المتغيرات اللي يحطها ربط Supabase مع Vercel تلقائيًا، أو اللي تحطها بيدك
+  // ربط Supabase مع Vercel أحيانًا يضيف بادئة للأسماء (مثل STORAGE_SUPABASE_URL)، فندوّر بأي اسم ينتهي بالمطلوب
   const E = process.env;
-  const url = E.SUPABASE_URL || E.NEXT_PUBLIC_SUPABASE_URL;
-  const key = E.SUPABASE_SECRET_KEY || E.SUPABASE_SERVICE_ROLE_KEY;
+  const find = (...ends) => { for (const e of ends) { if (E[e]) return E[e]; const k = Object.keys(E).find((n) => n.endsWith('_' + e) && E[n]); if (k) return E[k]; } return ''; };
+  const url = find('SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
+  const key = find('SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !key) throw new Error('SUPABASE_URL و SUPABASE_SECRET_KEY ناقصين في إعدادات Vercel');
   env = { ...process.env, BOT_KV: supabaseKV({ url, key }), MEDIA: supabaseMedia({ url, key }) };
   return env;
