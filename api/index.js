@@ -14,7 +14,10 @@ function getEnv() {
   // ربط Supabase مع Vercel أحيانًا يضيف بادئة للأسماء (مثل STORAGE_SUPABASE_URL)، فندوّر بأي اسم ينتهي بالمطلوب
   const E = process.env;
   const find = (...ends) => { for (const e of ends) { if (E[e]) return E[e]; const k = Object.keys(E).find((n) => n.endsWith('_' + e) && E[n]); if (k) return E[k]; } return ''; };
-  const url = find('SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL');
+  let url = find('SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL').trim().replace(/\/+$/, '');
+  // لو انحط رقم المشروع بس (مثل zjdcziuyrcldujterxbi) أو الدومين بدون https نكمّله
+  if (/^[a-z0-9]{15,40}$/i.test(url)) url = `https://${url}.supabase.co`;
+  else if (url && !/^https?:\/\//i.test(url)) url = `https://${url}`;
   const key = find('SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY');
   if (!url || !key) throw new Error('SUPABASE_URL و SUPABASE_SECRET_KEY ناقصين في إعدادات Vercel');
   env = { ...process.env, BOT_KV: supabaseKV({ url, key }), MEDIA: supabaseMedia({ url, key }) };
