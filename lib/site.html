@@ -32,7 +32,7 @@
 *{box-sizing:border-box;margin:0;padding:0}
 html{-webkit-text-size-adjust:100%}
 @media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
-body{background:var(--bg);color:var(--ink);font-family:var(--ar);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:hidden;letter-spacing:-.01em}
+body{background:var(--bg);color:var(--ink);font-family:var(--ar);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased;overflow-x:clip;letter-spacing:-.01em}
 [hidden]{display:none!important}
 img,svg{display:block;max-width:100%}
 a{color:inherit;text-decoration:none}
@@ -1253,6 +1253,12 @@ footer .wrap{max-width:1024px}
 .sx-on .grid{perspective:1400px}
 .sx-on #grid > *,.sx-on .scroller > *{will-change:translate,scale,opacity}
 .sx-on #grid > .rv,.sx-on .scroller > .rv{transition:transform .45s var(--ease),box-shadow .45s var(--ease)}
+/* الصفوف الأفقية: تثبت مكانها وتمشي للنهاية مع السكرول، بعدها تكمل الصفحة */
+.pin-on .shelf.pinned .pin{position:sticky;top:var(--pin-top,64px)}
+.pin-on .shelf.pinned .scroller{scroll-snap-type:none;scroll-behavior:auto}
+.pin-on .shelf.pinned .pin-bar{display:block}
+.pin-bar{display:none;height:3px;border-radius:3px;background:#E8E8ED;max-width:1136px;margin:-18px auto 0;width:calc(100% - 44px);overflow:hidden}
+.pin-bar i{display:block;height:100%;width:100%;background:var(--ink);transform:scaleX(var(--p,0));transform-origin:right}
 
 
 .m-links{background:radial-gradient(260px 200px at 82% 18%,#FFD9E6 0,transparent 70%),radial-gradient(240px 220px at 10% 90%,#FFE8D9 0,transparent 70%),linear-gradient(160deg,#FFF7FA,#FCE7EF);color:#3A2430}
@@ -1399,9 +1405,46 @@ footer .wrap{max-width:1024px}
   .bk-form .row2{grid-template-columns:1fr}
 }
 @media (prefers-reduced-motion:reduce){ .bk-st.on,.bk-slot{animation:none} }
+
+/* صفحة التحميل */
+#ld{position:fixed;inset:0;z-index:10000;background:radial-gradient(600px 400px at 50% 42%,#FFFFFF,#F5F5F7 70%);display:grid;place-items:center;clip-path:inset(0 0 0 0);transition:clip-path 1s cubic-bezier(.76,0,.24,1)}
+#ld.out{clip-path:inset(0 0 100% 0)}
+#ld .in{display:grid;justify-items:center;gap:16px;transition:opacity .45s,transform .9s cubic-bezier(.76,0,.24,1)}
+#ld.out .in{opacity:0;transform:translateY(-40px)}
+#ld .f{position:relative;width:78px;height:74px}
+#ld .f svg{position:absolute;inset:0;width:100%;height:100%;transform:scaleX(-1)}
+#ld .f .base{color:#E3E3E8}
+#ld .f .fill{color:#1D1D1F;clip-path:inset(100% 0 0 0);animation:ldFill 1.25s cubic-bezier(.65,0,.35,1) .1s forwards}
+#ld .f .gold{color:#CDA670;clip-path:inset(100% 0 0 0);animation:ldFill 1.25s cubic-bezier(.65,0,.35,1) forwards;opacity:.9}
+@keyframes ldFill{to{clip-path:inset(0 0 0 0)}}
+#ld .w{font-family:var(--lat);font-size:16px;letter-spacing:.55em;margin-inline-start:.55em;direction:ltr;color:#1D1D1F;display:flex}
+#ld .w span{opacity:0;transform:translateY(8px);animation:ldL .6s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes ldL{to{opacity:1;transform:none}}
+#ld .bar{width:150px;height:2px;border-radius:2px;background:#E5E5EA;overflow:hidden;margin-top:6px}
+#ld .bar i{display:block;height:100%;background:linear-gradient(270deg,#CDA670,#1D1D1F);transform:scaleX(0);transform-origin:right;animation:ldBar 1.2s cubic-bezier(.4,0,.2,1) .15s forwards}
+@keyframes ldBar{70%{transform:scaleX(.82)}100%{transform:scaleX(1)}}
+#ld small{font-size:12.5px;color:#86868B;letter-spacing:.02em;opacity:0;animation:ldL .6s .7s forwards}
+html.ld-skip #ld{display:none}
+@media (prefers-reduced-motion:reduce){#ld{display:none}}
 </style>
 </head>
 <body>
+<div id="ld" aria-hidden="true"><div class="in">
+  <div class="f"><svg class="base"><use href="#falcon" fill="currentColor"/></svg><svg class="gold"><use href="#falcon" fill="currentColor"/></svg><svg class="fill"><use href="#falcon" fill="currentColor"/></svg></div>
+  <div class="w"><span style="animation-delay:0.35s">S</span><span style="animation-delay:0.41s">H</span><span style="animation-delay:0.47s">A</span><span style="animation-delay:0.53s">H</span><span style="animation-delay:0.59s">E</span><span style="animation-delay:0.65s">E</span><span style="animation-delay:0.71s">N</span></div>
+  <div class="bar"><i></i></div>
+  <small>مواقع · متاجر · أنظمة</small>
+</div></div>
+<script>
+(function(){ var d=document.documentElement, t0=Date.now(), seen=false;
+  try{ seen=sessionStorage.getItem('sd-ld')==='1'; }catch(e){}
+  if(seen){ d.classList.add('ld-skip'); return; }
+  function done(){ var el=document.getElementById('ld'); if(!el||el.classList.contains('out')) return;
+    setTimeout(function(){ el.classList.add('out'); try{ sessionStorage.setItem('sd-ld','1'); }catch(e){} setTimeout(function(){ el.remove(); },1100); },Math.max(0,1450-(Date.now()-t0))); }
+  if(document.readyState==='complete') done(); else window.addEventListener('load',done);
+  setTimeout(done,3500);
+})();
+</script>
 <a class="skip" href="#all">انتقل للمنتجات</a>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
   <symbol id="falcon" viewBox="0 0 232 220"><g transform="translate(4,10)" fill-rule="evenodd"><path d="M 50 40 C 80 18 132 18 158 30 C 174 38 180 52 180 72 L 180 90 C 178 100 172 106 160 110 L 146 118 C 130 126 110 126 94 122 C 74 118 58 130 48 148 C 40 164 32 186 28 200 L 10 200 L 6 184 C 4 140 10 90 26 62 C 32 52 40 46 50 40 Z M 143.5 62 A 5.5 5.5 0 1 0 132.5 62 A 5.5 5.5 0 1 0 143.5 62 Z"/><path d="M 158 68 C 188 74 214 88 224 112 L 216 106 C 202 100 180 102 162 104 L 150 116 Z"/></g></symbol>
@@ -2487,7 +2530,7 @@ document.querySelectorAll('.rv').forEach(observe);
   if(!window.matchMedia||matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   var mq=matchMedia('(min-width:1024px) and (hover:hover) and (pointer:fine)');
   var on=false, items=[], shelves=[], raf=0, dirty=true;
-  var SH=['latest','values','addons','works'];
+  var SH=[]; // الصفوف الأفقية صارت تتحرك بالتثبيت (تحت)
   function cl(v){ return v<0?0:v>1?1:v; }
   function ease(t){ return 1-Math.pow(1-t,3); }
   function collect(){
@@ -2543,6 +2586,69 @@ document.querySelectorAll('.rv').forEach(observe);
   }
   if(mq.addEventListener) mq.addEventListener('change',set); else if(mq.addListener) mq.addListener(set);
   set();
+})();
+
+/* ===== الصفوف الأفقية: سكرول لتحت = تمشي البطاقات للنهاية، بعدها تكمل الصفحة (كمبيوتر فقط) ===== */
+(function(){
+  if(!window.matchMedia||matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var mq=matchMedia('(min-width:1024px) and (hover:hover) and (pointer:fine)');
+  var on=false, list=[], raf=0, lock=false;
+  function setup(){
+    list=[];
+    [].forEach.call(document.querySelectorAll('section.shelf'),function(sec){
+      var sc=sec.querySelector('.scroller'); if(!sc) return;
+      var pin=sec.querySelector(':scope > .pin');
+      if(!pin){ pin=document.createElement('div'); pin.className='pin'; while(sec.firstChild) pin.appendChild(sec.firstChild); sec.appendChild(pin);
+        var bar=document.createElement('div'); bar.className='pin-bar'; bar.appendChild(document.createElement('i')); pin.appendChild(bar); var sp=document.createElement('div'); sp.className='pin-sp'; sp.setAttribute('aria-hidden','true'); sec.appendChild(sp); }
+      list.push({sec:sec,sc:sc,pin:pin,bar:pin.querySelector('.pin-bar'),sp:sec.querySelector(':scope > .pin-sp')});
+    });
+    measure();
+  }
+  function measure(){
+    var vh=innerHeight;
+    list.forEach(function(o){
+      o.sp.style.height='0px'; o.sec.classList.remove('pinned');
+      var D=o.sc.scrollWidth-o.sc.clientWidth;
+      if(!on||D<60){ o.D=0; return; }
+      o.sec.classList.add('pinned');
+      var h=o.pin.offsetHeight, top=Math.max(64,Math.round((vh-h)/2));
+      if(h>vh-70){ o.D=0; o.sec.classList.remove('pinned'); return; }
+      o.pin.style.setProperty('--pin-top',top+'px');
+      o.D=D; o.top=top; o.rtl=getComputedStyle(o.sc).direction==='rtl'; o.sp.style.height=D+'px';
+      var cs=getComputedStyle(o.sec); o.pad=parseFloat(cs.paddingTop)||0;
+    });
+    tick();
+  }
+  function tick(){ raf=0; if(!on) return;
+    list.forEach(function(o){ if(!o.D) return;
+      var start=o.sec.getBoundingClientRect().top+scrollY+o.pad-o.top;
+      var p=Math.min(1,Math.max(0,(scrollY-start)/o.D));
+      o.exp=p*o.D; lock=true; o.sc.scrollLeft=(o.rtl?-1:1)*o.exp; lock=false;
+      if(o.bar) o.bar.style.setProperty('--p',p.toFixed(4)); o.start=start; });
+  }
+  function kick(){ if(!raf) raf=requestAnimationFrame(tick); }
+  // لو حرّك البطاقات بالأسهم أو بالسحب الأفقي، نحرك الصفحة بنفس المقدار عشان يبقون متزامنين
+  function syncFromShelf(o){ if(lock||!o.D||Math.abs(Math.abs(o.sc.scrollLeft)-(o.exp||0))<3) return; var p=Math.abs(o.sc.scrollLeft)/o.D; window.scrollTo(0,o.start+p*o.D); }
+  document.addEventListener('click',function(e){
+    if(!on) return; var b=e.target.closest&&e.target.closest('.shelf.pinned .paddle'); if(!b) return;
+    var o=list.filter(function(x){ return x.sec.contains(b); })[0]; if(!o||!o.D) return;
+    e.stopPropagation(); e.preventDefault();
+    var card=o.sc.firstElementChild, step=card?card.getBoundingClientRect().width+20:400;
+    window.scrollBy({top:b.classList.contains('next')?step:-step,behavior:'smooth'});
+  },true);
+  function onScroll(){ kick(); }
+  var mo=('MutationObserver' in window)?new MutationObserver(function(){ if(on) setTimeout(measure,50); }):null;
+  function set(){ var want=mq.matches; if(want===on&&list.length) return; on=want;
+    document.documentElement.classList.toggle('pin-on',on);
+    if(!list.length) setup(); else measure();
+    list.forEach(function(o){ if(!o.hooked){ o.hooked=1; o.sc.addEventListener('scroll',function(){ if(on) syncFromShelf(o); },{passive:true}); } });
+    if(on){ addEventListener('scroll',onScroll,{passive:true}); if(mo) list.forEach(function(o){ mo.observe(o.sc,{childList:true}); }); }
+    else { removeEventListener('scroll',onScroll); if(mo) mo.disconnect(); }
+  }
+  var rt; addEventListener('resize',function(){ clearTimeout(rt); rt=setTimeout(function(){ if(on) measure(); },150); });
+  if(mq.addEventListener) mq.addEventListener('change',set); else if(mq.addListener) mq.addListener(set);
+  if(document.readyState==='complete') set(); else addEventListener('load',set);
+  if(document.fonts&&document.fonts.ready) document.fonts.ready.then(function(){ if(on) measure(); });
 })();
 </script>
 </body>
