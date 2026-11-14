@@ -10,7 +10,10 @@ export const config = { maxDuration: 30 };
 let env;
 function getEnv() {
   if (env) return env;
-  const url = process.env.SUPABASE_URL, key = process.env.SUPABASE_SECRET_KEY;
+  // يقبل أسماء المتغيرات اللي يحطها ربط Supabase مع Vercel تلقائيًا، أو اللي تحطها بيدك
+  const E = process.env;
+  const url = E.SUPABASE_URL || E.NEXT_PUBLIC_SUPABASE_URL;
+  const key = E.SUPABASE_SECRET_KEY || E.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('SUPABASE_URL و SUPABASE_SECRET_KEY ناقصين في إعدادات Vercel');
   env = { ...process.env, BOT_KV: supabaseKV({ url, key }), MEDIA: supabaseMedia({ url, key }) };
   return env;
