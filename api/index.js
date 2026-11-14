@@ -21,6 +21,21 @@ function getEnv() {
   return env;
 }
 
+async function health() {
+  const E = process.env, out = {};
+  const names = Object.keys(E).filter((n) => /SUPABASE|ADMIN_PASSWORD|SESSION_SECRET|OWNER_WA/.test(n) && !/^NEXT_PUBLIC_SUPABASE_ANON|JWT/.test(n));
+  out.found = names.sort(); // الأسماء بس، بدون القيم
+  out.admin_password = E.ADMIN_PASSWORD ? 'موجود' : 'ناقص';
+  out.session_secret = E.SESSION_SECRET ? (E.SESSION_SECRET.length >= 16 ? 'موجود' : 'قصير، لازم ١٦ حرف أو أكثر') : 'ناقص';
+  try {
+    const env = getEnv();
+    out.supabase_env = 'موجود';
+    try { await env.BOT_KV.get('health:ping'); out.database = 'متصل ✓'; }
+    catch (err) { out.database = 'فشل الاتصال: ' + String(err.message).slice(0, 300); }
+  } catch (err) { out.supabase_env = String(err.message); }
+  return new Response(JSON.stringify(out, null, 2), { headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
+}
+
 export default {
   async fetch(request) {
     // الصفحات العامة أول (ما تحتاج قاعدة بيانات)
@@ -32,8 +47,10 @@ export default {
       const page = await servePublic(url, undefined, kv);
       if (page) return page;
     }
+    // فحص سريع: /api/health يقول وش الناقص بدون ما يكشف أي قيمة
+    if (url.pathname === '/api/health') return health();
     let e;
-    try { e = getEnv(); } catch (err) { return new Response(String(err.message), { status: 500 }); }
+    try { e = getEnv(); } catch (err) { return Response.json({ error: String(err.message) }, { status: 500 }); }
     return app.fetch(request, e, { waitUntil });
   },
 };
