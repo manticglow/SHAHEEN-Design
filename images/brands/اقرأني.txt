@@ -1,0 +1,36 @@
+حط الصور في هذا المجلد بالأسماء التالية بالضبط (حروف إنجليزية صغيرة)، والموقع يلقطها تلقائياً.
+الامتدادات المقبولة: png أو svg أو webp أو jpg
+
+images/
+├── photo.jpg              ← صورتك الشخصية (عمودية، يُفضّل 1200×1500)
+├── freelance-logo.png     ← شعار منصة العمل الحر
+├── brands/
+│   ├── burghan.png        ← BURGHAN
+│   ├── be-first-lady.svg  ← Be First Lady   ✓ موجود
+│   ├── bellapour.png      ← BELLAPOUR       ✓ موجود
+│   ├── d-elegance.png     ← D ELEGANCE
+│   └── duwaidi.png        ← DUWAIDI         ✓ موجود
+├── social/
+│   ├── instagram.png      ← إنستقرام
+│   ├── x.png              ← إكس
+│   ├── tiktok.png         ← تيك توك
+│   ├── snapchat.png       ← سناب شات
+│   ├── linkedin.png       ← لينكدإن
+│   ├── behance.png        ← بيهانس
+│   └── youtube.png        ← يوتيوب
+└── payments/
+    ├── bank-logo.png      ← شعار البنك
+    ├── bank-transfer.png  ← أيقونة التحويل البنكي (اختياري)
+    ├── mada.png           ← مدى
+    ├── visa.png           ← Visa
+    ├── mastercard.png     ← Mastercard
+    ├── applepay.png       ← Apple Pay
+    └── stcpay.png         ← STC Pay
+
+نصائح:
+- الشعارات: PNG بخلفية شفافة، عرض 600 بكسل يكفي.
+- أيقونات السوشال: مربعة 128×128، والأفضل لون واحد (ذهبي أو أبيض) عشان تتناسق مع الموقع.
+- إذا ما حطيت صورة لبراند أو وسيلة دفع، يبقى اسمها مكتوب بدالها.
+- بيانات البنك ورقم وثيقة العمل الحر تنكتب في أول الكود داخل index.html:
+    BANK = { name, holder, account, iban }     و     license:''
+    وروابط الحسابات في SOCIAL  (الحساب اللي رابطه فاضي ما يظهر)

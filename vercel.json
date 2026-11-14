@@ -1,0 +1,92 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": [
+    "fra1"
+  ],
+  "cleanUrls": true,
+  "rewrites": [
+    {
+      "source": "/",
+      "destination": "/api/index?__p="
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/index?__p=sitemap.xml"
+    },
+    {
+      "source": "/robots.txt",
+      "destination": "/api/index?__p=robots.txt"
+    },
+    {
+      "source": "/admin",
+      "destination": "/api/index?__p=admin"
+    },
+    {
+      "source": "/webhook",
+      "destination": "/api/index?__p=webhook"
+    },
+    {
+      "source": "/leads",
+      "destination": "/api/index?__p=leads"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "/api/index?__p=api/:path*"
+    },
+    {
+      "source": "/:page([a-z][a-z0-9-]{1,40})",
+      "destination": "/api/index?__p=:page"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        }
+      ]
+    },
+    {
+      "source": "/images/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=2592000"
+        }
+      ]
+    },
+    {
+      "source": "/lib/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
+      "source": "/og/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=604800"
+        }
+      ]
+    }
+  ],
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "{lib/site.html,404.html}"
+    }
+  }
+}
