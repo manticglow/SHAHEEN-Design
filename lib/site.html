@@ -1430,6 +1430,15 @@ html.ld-skip #ld{display:none}
 </style>
 </head>
 <body>
+<script>
+// عدّاد زيارات بسيط: بدون كوكيز ولا بيانات شخصية، يشتغل على الدومين الحقيقي بس
+(function(){ if(!window.SD_PATHS||!navigator.sendBeacon) return;
+  var first=false; try{ var d=new Date().toDateString(); if(localStorage.getItem('sd-v')!==d){ localStorage.setItem('sd-v',d); first=true; } }catch(e){}
+  var ref=''; try{ ref=document.referrer?new URL(document.referrer).hostname:''; }catch(e){}
+  window.sdHit=function(p,u){ try{ navigator.sendBeacon('/api/hit',new Blob([JSON.stringify({p:p,r:u?ref:'',u:u?1:0})],{type:'application/json'})); }catch(e){} };
+  sdHit(location.pathname,first);
+})();
+</script>
 <div id="ld" aria-hidden="true"><div class="in">
   <div class="f"><svg class="base"><use href="#falcon" fill="currentColor"/></svg><svg class="gold"><use href="#falcon" fill="currentColor"/></svg><svg class="fill"><use href="#falcon" fill="currentColor"/></svg></div>
   <div class="w"><span style="animation-delay:0.35s">S</span><span style="animation-delay:0.41s">H</span><span style="animation-delay:0.47s">A</span><span style="animation-delay:0.53s">H</span><span style="animation-delay:0.59s">E</span><span style="animation-delay:0.65s">E</span><span style="animation-delay:0.71s">N</span></div>
@@ -2189,7 +2198,7 @@ $('sendOrder').addEventListener('click',function(){ if(!form.name.trim()){ var i
 
 // ── overlays ──
 var openEl=null, lastFocus=null;
-function show(m,instant){ if(m.id==='pp'&&cur) document.title=cur.full+' | شاهين ديزاين'; else if(m.id==='book') document.title='احجز استشارة مجانية | شاهين ديزاين'; if(openEl&&openEl!==m) hide(true); lastFocus=document.activeElement; openEl=m; if(m!==$('pp')){ var s=$('scrim'); s.hidden=false; requestAnimationFrame(function(){ s.classList.add('on'); }); } if(instant) m.classList.add('on'); else requestAnimationFrame(function(){ m.classList.add('on'); }); m.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; setTimeout(function(){ var f=m.querySelector('[data-close]'); if(f) f.focus(); },80); }
+function show(m,instant){ if(window.sdHit&&m.id==='pp'&&cur) sdHit('p:'+cur.id); else if(window.sdHit&&m.id==='book') sdHit('book:open'); if(m.id==='pp'&&cur) document.title=cur.full+' | شاهين ديزاين'; else if(m.id==='book') document.title='احجز استشارة مجانية | شاهين ديزاين'; if(openEl&&openEl!==m) hide(true); lastFocus=document.activeElement; openEl=m; if(m!==$('pp')){ var s=$('scrim'); s.hidden=false; requestAnimationFrame(function(){ s.classList.add('on'); }); } if(instant) m.classList.add('on'); else requestAnimationFrame(function(){ m.classList.add('on'); }); m.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; setTimeout(function(){ var f=m.querySelector('[data-close]'); if(f) f.focus(); },80); }
 function hide(silent){ if(!openEl) return; document.title=BASE_TITLE; var s=$('scrim'); s.classList.remove('on'); openEl.classList.remove('on'); openEl.setAttribute('aria-hidden','true'); openEl=null; document.body.style.overflow=''; setTimeout(function(){ if(!openEl||openEl===$('pp')) s.hidden=true; },350); if(!silent&&lastFocus&&lastFocus.focus) lastFocus.focus(); }
 var closeAll=function(){ if(openEl===$('pp')) closePP(); else if((openEl===$('bag')&&history.state&&history.state.bag)||(openEl===$('book')&&history.state&&history.state.book)) history.back(); else hide(); };
 // ── التنقلات: انتقال مشترك للتصميم + زر الرجوع + روابط مباشرة ──
@@ -2497,7 +2506,7 @@ function submit(){ var err=$('bkErr'); err.textContent='';
   var post=bk.online?fetch(apiBase()+'/booking',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(data)}).then(function(r){ return r.json().catch(function(){ return {}; }).then(function(j){ j.status=r.status; return j; }); }):Promise.reject(0);
   post.then(function(j){
     if(j.status===409){ bk.taken[bk.slot]=1; bk.slot=null; renderDays(); renderSlots(); go(1); $('bkSum').textContent='هالوقت انحجز قبل شوي، اختر وقت ثاني'; return; }
-    if(!j.ok) throw 0; data.id=j.id||data.id; renderDone(data,true); go(3); })
+    if(!j.ok) throw 0; data.id=j.id||data.id; if(window.sdHit) sdHit('book:done'); renderDone(data,true); go(3); })
   .catch(function(){ renderDone(data,false); go(3); }); }
 $('bkNext').addEventListener('click',function(){ if(bk.step===1&&bk.slot) go(2); else if(bk.step===2) submit(); });
 $('bkChange').addEventListener('click',function(){ go(1); });
