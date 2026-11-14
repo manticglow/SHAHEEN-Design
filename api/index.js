@@ -28,7 +28,8 @@ async function health() {
   const E = process.env, out = {};
   const names = Object.keys(E).filter((n) => /SUPABASE|ADMIN_PASSWORD|SESSION_SECRET|OWNER_WA/.test(n) && !/^NEXT_PUBLIC_SUPABASE_ANON|JWT/.test(n));
   out.found = names.sort(); // الأسماء بس، بدون القيم
-  out.admin_password = E.ADMIN_PASSWORD ? 'موجود' : 'ناقص';
+  const pw = String(E.ADMIN_PASSWORD || '');
+  out.admin_password = pw ? `موجود — عدد حروفه ${pw.trim().length}${pw !== pw.trim() ? ' (فيه مسافة زايدة، تجاهلناها)' : ''}${/[\u0600-\u06FF]/.test(pw) ? ' (فيه حروف عربية)' : ''}` : 'ناقص';
   out.session_secret = E.SESSION_SECRET ? (E.SESSION_SECRET.length >= 16 ? 'موجود' : 'قصير، لازم ١٦ حرف أو أكثر') : 'ناقص';
   try {
     const env = getEnv();
