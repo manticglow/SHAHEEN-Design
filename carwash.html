@@ -361,24 +361,23 @@ function qrSvg(text){
 
 /* ---------- data layer (db when available, this browser otherwise) ---------- */
 var API='/api/wallet/', lastSig='';
+var tokStaff=null, tokOwner=null, tokCust={};
+try{tokStaff=sessionStorage.getItem('lamaa-st');tokOwner=sessionStorage.getItem('lamaa-ot');tokCust=JSON.parse(localStorage.getItem('lamaa-ct')||'{}')||{};}catch(e){}
+function saveToks(){try{ if(tokStaff) sessionStorage.setItem('lamaa-st',tokStaff); else sessionStorage.removeItem('lamaa-st'); if(tokOwner) sessionStorage.setItem('lamaa-ot',tokOwner); else sessionStorage.removeItem('lamaa-ot'); localStorage.setItem('lamaa-ct',JSON.stringify(tokCust)); }catch(e){}}
+function auth(){ var c=[]; if(meId&&tokCust[meId]) c.push(tokCust[meId]); return {staff:tokStaff||undefined,owner:tokOwner||undefined,cust:c}; }
 function apply(st){ if(!st||!st.members) return false; var sig=JSON.stringify([st.members,st.orders,st.ratings,st.feed,st.config]); if(sig===lastSig) return false; lastSig=sig; members=st.members; orders=st.orders||[]; ratings=st.ratings||[]; feed=st.feed||{items:[],days:{}}; config=st.config||config; return true; }
-function post(path,body){ return fetch(API+path,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){ if(!r.ok){ if(j&&j.state) apply(j.state); throw j; } return j; });}); }
-function put(kind,data){ return post('put',{kind:kind,data:data}).then(function(st){ apply(st); mineChanged(); ordersChanged(); render(); }).catch(function(e){ toast((e&&e.error)||'ما انحفظ، تأكد من الاتصال'); render(); }); }
-function putMember(m){ members[m.id]=m; render(); return put('member',m); }
-function putFeed(text,by,stamp){
-  feed=JSON.parse(JSON.stringify(feed));feed.items=[{at:new Date().toISOString(),text:text,by:by||''}].concat(feed.items||[]).slice(0,40);
-  if(stamp){var k=dayKey();feed.days=feed.days||{};feed.days[k]=(feed.days[k]||0)+1;var ks=Object.keys(feed.days).sort();while(ks.length>30){delete feed.days[ks.shift()];}}
-  return put('feed',feed);
+function post(body){ body.auth=auth(); return fetch(API+'op',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){ if(!r.ok){ j=j||{}; j.status=r.status; if(j.state) apply(j.state); throw j; } return j; });}); }
+function op(name,data){
+  return post({op:name,data:data||{}}).then(function(st){ apply(st); mineChanged(); ordersChanged(); render(); return st; })
+    .catch(function(e){ if(e&&e.status===401){ if(/موظف/.test(e.error||'')){tokStaff=null;staffName=null;} if(/صاحب/.test(e.error||'')) tokOwner=null; saveToks(); } toast((e&&e.error)||'ما انحفظ، تأكد من الاتصال'); render(); throw e; });
 }
-function putRating(r){ ratings=[r].concat(ratings); return put('rating',r); }
-function putOrder(o){ var i=-1; orders.forEach(function(x,j){if(x.id===o.id)i=j;}); if(i>-1) orders[i]=o; else orders=[o].concat(orders); return put('order',o); }
 function ordersChanged(){
   if(role!=='customer'||!meId) return;
   orders.forEach(function(o){ if(o.member!==meId) return; var prev=myOrderSeen[o.id];
-    if(prev&&prev!==o.status){ if(prev==='unpaid'&&o.status==='paid'){ sfx('chime'); celebrate('تم الدفع',o.method+' · فاتورتك جاهزة'); toast('استلمنا دفعتك '+o.method+'. فاتورتك جاهزة'); } if(o.status==='washing'){ sfx('spray'); } if(o.status==='washing') toast('بدأ غسيل سيارتك ('+o.no+')'); else if(o.status==='done') toast('سيارتك جاهزة! تقدر تستلمها الحين'); }
+    if(prev&&prev!==o.status){ if(prev==='unpaid'&&o.status==='paid'){ sfx('chime'); celebrate('تم الدفع',o.method+' · فاتورتك جاهزة'); toast('استلمنا دفعتك '+o.method+'. فاتورتك جاهزة'); } if(o.status==='washing'){ sfx('spray'); toast('بدأ غسيل سيارتك ('+o.no+')'); } else if(o.status==='done') toast('سيارتك جاهزة! تقدر تستلمها الحين'); }
     myOrderSeen[o.id]=o.status; });
 }
-function putConfig(patch){ render(); return put('config',patch||config); }
+function putConfig(patch){ render(); return op('config',patch).catch(function(){}); }
 function setLive(on,text){live=on;$('liveDot').className='dot'+(on?' live':'');$('liveText').textContent=text;}
 var pollT=null;
 function poll(){
@@ -475,7 +474,7 @@ function walkHtml(m){
   return '<div class="stack" style="border-top:1px dashed var(--line);padding-top:12px"><b>بيع غسلة في المحل</b><div class="pkgs">'+pk+'</div><div class="seg">'+mt+'</div><label class="addon" for="warned"><input type="checkbox" id="warned"'+(walk.warned?' checked':'')+'><span style="flex:1">نبّهت الزبون يخرج متعلقاته الشخصية</span></label><button class="btn primary" id="walkPay" type="button"'+(walk.warned?'':' disabled')+'>استلمت '+walk.method+' · '+money(PKGS.filter(function(x){return x[0]===walk.pkg;})[0][3])+'</button></div>';
 }
 function vStaff(){
-  if(!staffName){
+  if(!staffName||!tokStaff){ staffName=null;
     var dots='';for(var i=0;i<4;i++)dots+='<i class="'+(i<pin.length?'on':'')+'"></i>';
     var keys=['1','2','3','4','5','6','7','8','9','','0','⌫'].map(function(k){return k===''?'<span></span>':'<button type="button" data-key="'+k+'" aria-label="'+(k==='⌫'?'مسح':k)+'">'+k+'</button>';}).join('');
     return '<div class="col"><div class="panel stack" style="text-align:center"><div><h2>دخول الموظف</h2><p class="muted small" style="margin:2px 0 0">اكتب رمزك السري. في التجربة: 1234</p></div><div class="pinDots" aria-label="'+pin.length+' من 4">'+dots+'</div><p class="err" id="pinErr" hidden>الرمز غلط، جرّب مرة ثانية</p><div class="keypad">'+keys+'</div></div></div>';
@@ -521,6 +520,10 @@ function decodeImage(file){
 
 /* ---------- owner ---------- */
 function vOwner(){
+  if(!tokOwner) return '<div class="col"><div class="panel stack" style="text-align:center"><div><h2>دخول صاحب المغسلة</h2><p class="muted small" style="margin:2px 0 0">رمز صاحب المغسلة مختلف عن رموز الموظفين. في التجربة: 9999</p></div><form id="ownerForm" class="stack" style="align-items:center"><label class="f" for="oPin" style="align-items:center">الرمز<input id="oPin" type="password" inputmode="numeric" maxlength="8" autocomplete="off" dir="ltr" style="width:200px;text-align:center;font-size:22px;letter-spacing:8px"></label><p class="err" id="oErr" hidden></p><button class="btn primary" type="submit" style="width:200px">دخول</button></form></div></div>';
+  return vOwnerIn();
+}
+function vOwnerIn(){
   var M=list(), N=need(), today=dayKey();
   var stampsToday=(feed.days||{})[today]||0, near=M.filter(function(m){return m.stamps>=N-3&&m.stamps<N;}).length, ready=M.filter(function(m){return m.stamps>=N;}).length;
   var red=M.reduce(function(a,m){return a+(m.rewards||0);},0);
@@ -555,13 +558,13 @@ function vOwner(){
    '<div class="panel stack"><h3>نظام المكافأة</h3><div class="seg">'+seg+'</div><p class="muted small" style="margin:0">يتغير على كل البطاقات مباشرة.</p><h3 style="margin-top:6px">أقل مدة بين ختمين</h3><div class="seg">'+[[60,'ساعة'],[180,'٣ ساعات'],[1440,'يوم']].map(function(g){return '<button type="button" data-gap="'+g[0]+'" aria-pressed="'+(gapMin()===g[0])+'">'+g[1]+'</button>';}).join('')+'</div><form id="dForm" class="stack" style="gap:8px"><label class="f" for="dText">نص إخلاء المسؤولية<textarea id="dText" maxlength="300">'+esc(disc())+'</textarea></label><button class="btn ghost sm" type="submit">حفظ النص</button></form><form id="gForm" class="stack" style="gap:8px"><label class="f" for="gLink">رابط تقييم المغسلة في قوقل<input id="gLink" type="text" dir="ltr" placeholder="https://g.page/r/..." value="'+esc(config.google||'')+'"></label><button class="btn ghost sm" type="submit">حفظ الرابط</button></form></div>'+
    '<div class="panel"><h3>أنواع سيارات زبائنك</h3><div class="stack" style="gap:8px;margin-top:10px">'+(types||'<span class="muted small">ما فيه بيانات</span>')+'</div></div>'+
    '<div class="panel"><h3>الموظفين</h3><div class="list">'+staff+'</div><form id="staffForm" class="row" style="margin-top:10px;flex-wrap:wrap"><input id="sName" type="text" placeholder="اسم الموظف" style="flex:1;min-width:120px" aria-label="اسم الموظف"><input id="sPin" type="tel" inputmode="numeric" maxlength="4" placeholder="رمز ٤ أرقام" dir="ltr" style="width:130px" aria-label="رمز الموظف"><button class="btn primary sm" type="submit">إضافة</button></form></div>'+
-   '<div class="panel"><h3>آخر النشاط</h3><div class="feed" style="margin-top:8px">'+(fd||'<span class="muted small">ما فيه نشاط للحين</span>')+'</div></div></div></div></div>';
+   '<button class="btn ghost sm" id="ownerOut" type="button">خروج من لوحة صاحب المغسلة</button><div class="panel"><h3>آخر النشاط</h3><div class="feed" style="margin-top:8px">'+(fd||'<span class="muted small">ما فيه نشاط للحين</span>')+'</div></div></div></div></div>';
 }
 
 /* ---------- render & events ---------- */
 function render(){
   document.querySelectorAll('.roles button').forEach(function(b){b.setAttribute('aria-selected',String(b.dataset.role===role));});
-  var a=document.activeElement, keep=a&&a.id&&(a.id==='q'||a.id==='dText'||a.id==='gLink'||a.id==='rNote'||a.id==='offer'||a.id==='jName'||a.id==='jPhone'||a.id==='sName'||a.id==='sPin')?{id:a.id,s:a.selectionStart}:null;
+  var a=document.activeElement, keep=a&&a.id&&(a.id==='q'||a.id==='oPin'||a.id==='dText'||a.id==='gLink'||a.id==='rNote'||a.id==='offer'||a.id==='jName'||a.id==='jPhone'||a.id==='sName'||a.id==='sPin')?{id:a.id,s:a.selectionStart}:null;
   var vk=[role,custView,!!(meId&&members[meId]),!!staffName,draft.step,paying,curOrder].join('|'), fresh=vk!==lastViewKey; lastViewKey=vk;
   $('view').innerHTML=role==='customer'?vCustomer():role==='staff'?vStaff():vOwner();
   if(fresh&&!REDUCED){ var vw=$('view'); vw.classList.remove('enter'); void vw.offsetWidth; vw.classList.add('enter'); clearTimeout(render._t); render._t=setTimeout(function(){vw.classList.remove('enter');},900); if(role==='owner') countUp(); }
@@ -592,7 +595,7 @@ $('view').addEventListener('click',function(e){
   if(t.dataset.gap){config=Object.assign({},config,{gapMin:Number(t.dataset.gap)});putConfig({gapMin:Number(t.dataset.gap)});toast('صار الحد: ختم واحد كل '+gapLabel());return;}
   if(t.dataset.key){
     if(t.dataset.key==='⌫') pin=pin.slice(0,-1); else if(pin.length<4) pin+=t.dataset.key;
-    if(pin.length===4){var tryPin=pin; pin=''; post('pin',{pin:tryPin}).then(function(j){staffName=j.name;try{sessionStorage.setItem('lamaa-staff',j.name);}catch(x){} render();},function(){render(); var pe=$('pinErr'); if(pe) pe.hidden=false;}); render(); return;}
+    if(pin.length===4){var tryPin=pin; pin=''; post({op:'pin',pin:tryPin}).then(function(j){staffName=j.name;tokStaff=j.token;saveToks();try{sessionStorage.setItem('lamaa-staff',j.name);}catch(x){} render();},function(e){render(); var pe=$('pinErr'); if(pe){ pe.textContent=(e&&e.error)||'الرمز غلط'; pe.hidden=false; }}); render(); return;}
     render(); return;
   }
   switch(t.id){
@@ -600,7 +603,7 @@ $('view').addEventListener('click',function(e){
     case 'addWallet': join(); break;
     case 'flip': flipped=!flipped; render(); break;
     case 'leave': custView='card'; curOrder=null; meId=null; prevMine=null; flipped=false; draft={step:1,name:'',phone:'',type:'SUV',color:'#F4F6F8'}; try{localStorage.removeItem('lamaa-me');}catch(x){} render(); break;
-    case 'logout': staffName=null; sel=null; try{sessionStorage.removeItem('lamaa-staff');}catch(x){} render(); break;
+    case 'logout': staffName=null; tokStaff=null; saveToks(); sel=null; try{sessionStorage.removeItem('lamaa-staff');}catch(x){} render(); break;
     case 'clearSel': walk=null; sel=null; render(); break;
     case 'scan': scanMsg=''; startScan(); break;
     case 'stamp': addStamp(); break;
@@ -611,6 +614,7 @@ $('view').addEventListener('click',function(e){
     case 'toCard': custView='card'; render(); break;
     case 'skipRate': skipRating(); break;
     case 'redeem': redeem(); break;
+    case 'ownerOut': tokOwner=null; saveToks(); render(); break;
   }
 });
 $('view').addEventListener('change',function(e){ if(e.target.id==='warned'&&walk){ walk.warned=e.target.checked; render(); return; } if(e.target.id==='agree'){ agreed=e.target.checked; render(); return; } var a=e.target.dataset&&e.target.dataset.addon; if(!a) return; var i=ord.addons.indexOf(a); if(e.target.checked&&i<0) ord.addons.push(a); else if(!e.target.checked&&i>-1) ord.addons.splice(i,1); render(); });
@@ -626,11 +630,12 @@ $('view').addEventListener('submit',function(e){
     var err=$('jErr'), ph=normPhone(draft.phone);
     if(draft.name.trim().length<2){err.textContent='اكتب اسمك';err.hidden=false;return;}
     if(!/^05\d{8}$/.test(ph)){err.textContent='رقم الجوال لازم يبدأ بـ 05 ويكون ١٠ أرقام';err.hidden=false;return;}
-    post('lookup',{phone:ph}).then(function(j){ if(j&&j.id&&members[j.id]){ setMe(j.id); toast('رجعت لك بطاقتك بأختامها'); render(); } else { draft.step=2; render(); } },function(){ draft.step=2; render(); });
+    post({op:'lookup',phone:ph}).then(function(j){ if(j&&j.id&&members[j.id]){ setMe(j.id,j.token); toast('رجعت لك بطاقتك بأختامها'); render(); } else { draft.step=2; render(); } },function(){ draft.step=2; render(); });
   } else if(id==='offerForm'){
     var txt=($('offer').value||'').trim(); if(!txt) return;
-    config=Object.assign({},config,{offers:(config.offers||0)+1}); putConfig({offers:config.offers}); putFeed('عرض لكل الزبائن: '+txt.slice(0,40),'');
-    toast(txt);
+    op('offer',{text:txt}).then(function(){ toast(txt); }).catch(function(){});
+  } else if(id==='ownerForm'){
+    post({op:'ownerPin',pin:($('oPin').value||'')}).then(function(j){ tokOwner=j.token; saveToks(); render(); },function(e){ var oe=$('oErr'); if(oe){ oe.textContent=(e&&e.error)||'الرمز غلط'; oe.hidden=false; } });
   } else if(id==='dForm'){
     var dt=($('dText').value||'').trim(); if(dt.length<20){toast('اكتب نص أوضح');return;}
     config=Object.assign({},config,{disclaimer:dt}); putConfig({disclaimer:dt}); toast('انحفظ نص إخلاء المسؤولية');
@@ -641,87 +646,62 @@ $('view').addEventListener('submit',function(e){
     var n=($('sName').value||'').trim(), p=normPhone($('sPin').value);
     if(n.length<2||!/^\d{4}$/.test(p)){toast('اكتب اسم الموظف ورمز من ٤ أرقام');return;}
     
-    putConfig({staffAdd:[{name:n,pin:p}]}); toast('انضاف '+n+'. رمزه '+p);
+    op('config',{staffAdd:{name:n,pin:p}}).then(function(){ toast('انضاف '+n+'. رمزه '+p); }).catch(function(){});
   }
 });
-function setMe(id){meId=id;try{localStorage.setItem('lamaa-me',id);}catch(x){} var m=members[id]; prevMine=m?{stamps:m.stamps,rewards:m.rewards}:null;}
+function setMe(id,tok){meId=id; if(tok){tokCust[id]=tok;} saveToks(); try{localStorage.setItem('lamaa-me',id);}catch(x){} var m=members[id]; prevMine=m?{stamps:m.stamps,rewards:m.rewards}:null;}
 function join(){
-  var ph=normPhone(draft.phone), id='LM-'+Date.now().toString(36).toUpperCase().slice(-5), now=new Date().toISOString();
-  var m={id:id,name:draft.name.trim(),phone:ph,type:draft.type,color:draft.color,stamps:1,total:1,rewards:0,joined:now,visits:[]};
-  setMe(id); members[id]=m; prevMine={stamps:1,rewards:0}; lastPop=1; render();
-  putMember(m).then(function(){return putFeed('انضم '+m.name,'',true);}); sfx('splash'); celebrate('بطاقتك جاهزة','وأول ختم هدية علينا'); toast('أهلًا '+m.name.split(' ')[0]+'! بطاقتك في المحفظة وأول ختم هدية');
+  var nm=draft.name.trim();
+  post({op:'join',data:{name:nm,phone:normPhone(draft.phone),type:draft.type,color:draft.color}}).then(function(st){
+    apply(st); if(st.issued){ setMe(st.issued.id,st.issued.token); prevMine={stamps:1,rewards:0}; lastPop=1; }
+    render(); sfx('splash'); celebrate('بطاقتك جاهزة','وأول ختم هدية علينا'); toast('أهلًا '+nm.split(' ')[0]+'! بطاقتك في المحفظة وأول ختم هدية');
+  },function(e){ toast((e&&e.error)||'ما قدرنا نسوي البطاقة'); });
 }
 function addStamp(){
   var m=members[sel]; if(!m) return; var w=waitMin(m); if(w){ toast('ما ينفع ختمين خلال '+gapLabel()+'. باقي '+waitLabel(w)); render(); return; }
-  m=JSON.parse(JSON.stringify(m)); var now=new Date().toISOString();
-  m.stamps=Math.min(need(),(m.stamps||0)+1); m.total=(m.total||0)+1; m.visits=(m.visits||[]).concat([now]).slice(-10); m.pendingRating=now; m.lastStaff=staffName;
-  putMember(m).then(function(){return putFeed('ختم لـ '+m.name,staffName,true);});
-  sfx('splash'); celebrate(m.stamps>=need()?'اكتملت البطاقة':'انضاف الختم', m.name.split(' ')[0]+' · '+m.stamps+' من '+need(), m.stamps>=need()?'gift':''); toast(m.stamps>=need()?'اكتملت بطاقة '+m.name.split(' ')[0]+'. المكافأة جاهزة':'تم. '+m.name.split(' ')[0]+' صار عنده '+m.stamps+' من '+need());
-  
+  op('stamp',{id:m.id}).then(function(){ var x=members[m.id]; if(!x) return; sfx('splash'); celebrate(x.stamps>=need()?'اكتملت البطاقة':'انضاف الختم', x.name.split(' ')[0]+' · '+x.stamps+' من '+need(), x.stamps>=need()?'gift':''); }).catch(function(){});
+}
+function redeem(){
+  var m=members[sel]; if(!m) return;
+  op('redeem',{id:m.id}).then(function(){ sfx('chime'); celebrate('سلّمت المكافأة',m.name.split(' ')[0]+' بدأ بطاقة جديدة','gift'); }).catch(function(){});
 }
 function pay(method){
   var m=members[meId]; if(!m||paying) return;
-  var pk=PKGS.filter(function(x){return x[0]===ord.pkg;})[0], items=[[pk[1],pk[3]]];
-  ADDONS.forEach(function(a){ if(ord.addons.indexOf(a[0])>-1) items.push([a[1],a[2]]); });
-  var total=items.reduce(function(s,i){return s+i[1];},0), now=new Date(), id='o'+now.getTime().toString(36);
-  var no='INV-'+dayKey(now).slice(2).replace(/-/g,'')+'-'+String(now.getTime()).slice(-4);
+  var data={member:m.id,pkg:ord.pkg,addons:ord.addons.slice(),method:method,agreed:agreed};
   if(method==='store'){
-    var ou={id:id,no:no.replace('INV-','ORD-'),member:m.id,name:m.name,phone:m.phone,car:m.type,items:items,total:total,method:'في المغسلة',status:'unpaid',at:now.toISOString(),agreed:true,agreedAt:now.toISOString()};
-    myOrderSeen[id]='unpaid'; curOrder=id; custView='invoice';
-    putOrder(ou).then(function(){return putFeed('طلب '+ou.no+' بانتظار الدفع في المغسلة · '+money(total)+' من '+m.name,'',false);});
-    render(); sfx('pop'); toast('طلبك وصل للموظف. ادفع له كاش أو شبكة'); return;
+    op('order',data).then(function(st){ var id=st.issued&&st.issued.order; if(id){ myOrderSeen[id]='unpaid'; curOrder=id; custView='invoice'; render(); } sfx('pop'); toast('طلبك وصل للموظف. ادفع له كاش أو شبكة'); }).catch(function(){});
+    return;
   }
   paying=true; render();
   setTimeout(function(){
-    var o={id:id,no:no,member:m.id,name:m.name,phone:m.phone,car:m.type,items:items,total:total,method:method,status:'paid',at:now.toISOString(),agreed:true,agreedAt:now.toISOString()};
-    myOrderSeen[id]='paid'; paying=false; curOrder=id; custView='invoice';
-    putOrder(o).then(function(){return putFeed('طلب مدفوع '+no+' · '+money(total)+' من '+m.name,'',false);});
-    render(); sfx('chime'); celebrate('تم الدفع',money(total)+' · فاتورتك جاهزة'); toast('تم الدفع '+money(total)+'. فاتورتك جاهزة');
+    op('order',data).then(function(st){ paying=false; var id=st.issued&&st.issued.order; var o=orders.filter(function(x){return x.id===id;})[0];
+      if(id){ myOrderSeen[id]='paid'; curOrder=id; custView='invoice'; } render(); sfx('chime'); if(o){ celebrate('تم الدفع',money(o.total)+' · فاتورتك جاهزة'); toast('تم الدفع '+money(o.total)+'. فاتورتك جاهزة'); }
+    }).catch(function(){ paying=false; render(); });
   },1300);
 }
 function markPaid(id,method){
-  var o=orders.filter(function(x){return x.id===id;})[0]; if(!o) return; o=JSON.parse(JSON.stringify(o));
-  o.status='paid'; o.method=method; o.paidAt=new Date().toISOString(); o.no=o.no.replace('ORD-','INV-'); o.by=staffName;
-  putOrder(o).then(function(){return putFeed('استلم '+method+' '+money(o.total)+' · '+o.no,staffName,false);});
-  sfx('chime'); celebrate('استلمت '+method,money(o.total)+' · انرسلت الفاتورة للزبون'); toast('انرسلت الفاتورة لجوال '+o.name.split(' ')[0]);
+  var o=orders.filter(function(x){return x.id===id;})[0]; if(!o) return;
+  op('orderStatus',{id:id,status:'paid',method:method}).then(function(){ sfx('chime'); celebrate('استلمت '+method,money(o.total)+' · انرسلت الفاتورة للزبون'); toast('انرسلت الفاتورة لجوال '+o.name.split(' ')[0]); }).catch(function(){});
 }
 function walkSale(){
-  var m=members[sel]; if(!m||!walk||!walk.warned) return;
-  var pk=PKGS.filter(function(x){return x[0]===walk.pkg;})[0], now=new Date(), id='o'+now.getTime().toString(36);
-  var o={id:id,no:'INV-'+dayKey(now).slice(2).replace(/-/g,'')+'-'+String(now.getTime()).slice(-4),member:m.id,name:m.name,phone:m.phone,car:m.type,items:[[pk[1],pk[3]]],total:pk[3],method:walk.method,status:'paid',at:now.toISOString(),paidAt:now.toISOString(),agreed:false,by:staffName};
-  var meth=walk.method; walk=null;
-  putOrder(o).then(function(){return putFeed('بيع في المحل '+meth+' '+money(o.total)+' · '+m.name,staffName,false);});
-  sfx('chime'); celebrate('استلمت '+meth,money(o.total)+' · الفاتورة وصلت لجوال الزبون'); toast('الطلب في قائمة الطلبات. اضغط «ابدأ» لما تبدأ الغسيل');
+  var m=members[sel]; if(!m||!walk||!walk.warned) return; var meth=walk.method, pk=walk.pkg;
+  op('walkin',{member:m.id,pkg:pk,method:meth,warned:true}).then(function(){ walk=null; render(); sfx('chime'); celebrate('استلمت '+meth,'الفاتورة وصلت لجوال الزبون'); toast('الطلب في قائمة الطلبات. اضغط «ابدأ» لما تبدأ الغسيل'); }).catch(function(){});
 }
 function setOrderStatus(id,st){
-  var o=orders.filter(function(x){return x.id===id;})[0]; if(!o) return; o=JSON.parse(JSON.stringify(o)); o.status=st; o.by=staffName;
-  if(st==='done') o.doneAt=new Date().toISOString();
-  putOrder(o);
-  if(st==='done'&&members[o.member]&&waitMin(members[o.member])){
-    putFeed('غسيل '+o.no+' جاهز · بدون ختم (أخذ ختم قبل أقل من '+gapLabel()+')',staffName,false);
-    toast('الطلب جاهز. ما انضاف ختم لأن آخر ختم له قبل أقل من '+gapLabel());  return;
-  }
-  if(st==='done'&&members[o.member]){
-    var m=JSON.parse(JSON.stringify(members[o.member])), now=new Date().toISOString();
-    m.stamps=Math.min(need(),(m.stamps||0)+1); m.total=(m.total||0)+1; m.visits=(m.visits||[]).concat([now]).slice(-10); m.pendingRating=now; m.lastStaff=staffName;
-    putMember(m).then(function(){return putFeed('غسيل '+o.no+' جاهز · ختم لـ '+m.name,staffName,true);});
-    sfx('splash'); celebrate('السيارة جاهزة','انضاف ختم لـ '+m.name.split(' ')[0]); toast('جاهزة. انضاف ختم لـ '+m.name.split(' ')[0]+' ووصله طلب التقييم');
-  } else { sfx('spray'); toast('بدأ غسيل طلب '+o.no); }
-  
+  op('orderStatus',{id:id,status:st}).then(function(){
+    var o=orders.filter(function(x){return x.id===id;})[0];
+    if(st==='washing'){ sfx('spray'); toast('بدأ غسيل طلب '+(o?o.no:'')); return; }
+    if(o&&o.stamped){ sfx('splash'); celebrate('السيارة جاهزة','انضاف ختم لـ '+o.name.split(' ')[0]); toast('جاهزة. انضاف ختم ووصل للزبون طلب التقييم'); }
+    else toast('الطلب جاهز. ما انضاف ختم لأن آخر ختم للزبون قبل أقل من '+gapLabel());
+  }).catch(function(){});
 }
 function sendRating(){
-  var m=members[meId]; if(!m||!rd.stars) return;
-  var r={id:'r'+Date.now().toString(36),member:m.id,name:m.name,phone:m.phone,stars:rd.stars,tags:rd.tags.slice(),note:(rd.note||'').trim().slice(0,300),by:m.lastStaff||'',visit:m.pendingRating,at:new Date().toISOString()};
-  var mm=JSON.parse(JSON.stringify(m)); delete mm.pendingRating; mm.thanks=rd.stars;
-  sfx('chime'); putRating(r).then(function(){return putMember(mm);}).then(function(){return putFeed('تقييم '+starsTxt(r.stars)+' من '+m.name,'',false);});
-  members[m.id]=mm; rd={stars:0,tags:[],note:''}; render();
-  setTimeout(function(){var x=members[meId]; if(x&&x.thanks){var y=JSON.parse(JSON.stringify(x)); delete y.thanks; putMember(y);}},12000);
+  var m=members[meId]; if(!m||!rd.stars) return; var stars=rd.stars;
+  op('rate',{member:m.id,stars:stars,tags:rd.tags.slice(),note:(rd.note||'').trim()}).then(function(){ rd={stars:0,tags:[],note:''}; sfx('chime'); render();
+    setTimeout(function(){ if(members[meId]&&members[meId].thanks) op('clearThanks',{member:meId}).catch(function(){}); },12000);
+  }).catch(function(){});
 }
-function skipRating(){ var m=members[meId]; if(!m) return; var mm=JSON.parse(JSON.stringify(m)); delete mm.pendingRating; members[m.id]=mm; putMember(mm); render(); }
-function redeem(){
-  var m=members[sel]; if(!m) return; m=JSON.parse(JSON.stringify(m)); m.stamps=0; m.rewards=(m.rewards||0)+1;
-  putMember(m).then(function(){return putFeed('سلّم غسلة مجانية لـ '+m.name,staffName,false);}); sfx('chime'); celebrate('سلّمت المكافأة',m.name.split(' ')[0]+' بدأ بطاقة جديدة','gift'); toast('سلّمت '+m.name.split(' ')[0]+' غسلته المجانية'); 
-}
+function skipRating(){ if(!meId) return; op('skipRate',{member:meId}).catch(function(){}); }
 $('cam').addEventListener('change',function(){
   var f=this.files&&this.files[0]; if(!f) return;
   scanMsg='جاري قراءة الكود…'; render();

@@ -4,6 +4,7 @@ import { waitUntil } from '@vercel/functions';
 import app from '../lib/app.js';
 import { servePublic } from '../lib/seo.js';
 import { supabaseKV, supabaseMedia } from '../lib/supabase.js';
+import { isAdmin } from '../lib/cms.js';
 
 export const config = { maxDuration: 30 };
 
@@ -24,8 +25,16 @@ function getEnv() {
   return env;
 }
 
-async function health() {
-  const E = process.env, out = {};
+// العام يشوف حالة مختصرة بس، والتفاصيل (أسماء المتغيرات والأرقام) لصاحب اللوحة بعد تسجيل الدخول
+async function health(request) {
+  const E = process.env;
+  let admin = false; try { admin = await isAdmin(request, E); } catch {}
+  if (!admin) {
+    const out = { ok: true, admin_password: E.ADMIN_PASSWORD ? 'موجود' : 'ناقص', session_secret: E.SESSION_SECRET ? 'موجود' : 'ناقص', note: 'سجّل دخول في /admin عشان تشوف التفاصيل' };
+    try { const e = getEnv(); await e.BOT_KV.get('health:ping'); out.database = 'متصل ✓'; } catch { out.database = 'غير متصل'; }
+    return new Response(JSON.stringify(out, null, 2), { headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
+  }
+  const out = {};
   const names = Object.keys(E).filter((n) => /SUPABASE|ADMIN_PASSWORD|SESSION_SECRET|OWNER_WA|WA_TOKEN|APP_SECRET|PHONE_NUMBER_ID|VERIFY_TOKEN|^MODE$|^ADMINS$/.test(n) && !/^NEXT_PUBLIC_SUPABASE_ANON|JWT/.test(n));
   out.found = names.sort(); // الأسماء بس، بدون القيم
   const pw = String(E.ADMIN_PASSWORD || '');
@@ -87,7 +96,7 @@ export default {
       if (page) return page;
     }
     // فحص سريع: /api/health يقول وش الناقص بدون ما يكشف أي قيمة
-    if (url.pathname === '/api/health') return health();
+    if (url.pathname === '/api/health') return health(request);
     let e;
     try { e = getEnv(); } catch (err) { return Response.json({ error: String(err.message) }, { status: 500 }); }
     return app.fetch(request, e, { waitUntil });
