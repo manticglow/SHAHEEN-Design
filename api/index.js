@@ -47,6 +47,17 @@ async function health() {
       const base = (E.GRAPH_BASE || 'https://graph.facebook.com').replace(/\/$/, '');
       const r = await fetch(`${base}/${E.GRAPH_VERSION || 'v26.0'}/${String(E.PHONE_NUMBER_ID).trim()}?fields=display_phone_number,verified_name,quality_rating`, { headers: { authorization: 'Bearer ' + String(E.WA_TOKEN).trim() } });
       const j = await r.json().catch(() => ({}));
+      // الأرقام اللي يقدر التوكن يوصلها (عشان نعرف معرف رقمك الحقيقي)
+      try {
+        const tok = String(E.WA_TOKEN).trim(), V = E.GRAPH_VERSION || 'v26.0';
+        const d = await (await fetch(`${base}/${V}/debug_token?input_token=${encodeURIComponent(tok)}`, { headers: { authorization: 'Bearer ' + tok } })).json();
+        const ids = new Set(); for (const g of ((d.data && d.data.granular_scopes) || [])) if (/whatsapp/.test(g.scope)) for (const t of (g.target_ids || [])) ids.add(t);
+        out.whatsapp_numbers = [];
+        for (const w of [...ids].slice(0, 6)) {
+          const pn = await (await fetch(`${base}/${V}/${w}/phone_numbers?fields=display_phone_number,verified_name,platform_type,code_verification_status,is_on_biz_app`, { headers: { authorization: 'Bearer ' + tok } })).json();
+          for (const n of (pn.data || [])) out.whatsapp_numbers.push({ number: n.display_phone_number, name: n.verified_name, phone_number_id: n.id, waba: w, platform: n.platform_type, on_business_app: !!n.is_on_biz_app });
+        }
+      } catch {}
       out.whatsapp = r.ok ? `متصل ✓ ${j.display_phone_number || ''} ${j.verified_name ? '(' + j.verified_name + ')' : ''}`.trim() : 'خطأ من Meta: ' + String((j.error && j.error.message) || r.status).slice(0, 200);
     } catch (err) { out.whatsapp = 'فشل الاتصال بـ Meta: ' + String(err.message).slice(0, 120); }
   }
