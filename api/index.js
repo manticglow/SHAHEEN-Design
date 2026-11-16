@@ -50,14 +50,25 @@ async function health() {
       // الأرقام اللي يقدر التوكن يوصلها (عشان نعرف معرف رقمك الحقيقي)
       try {
         const tok = String(E.WA_TOKEN).trim(), V = E.GRAPH_VERSION || 'v26.0';
-        const d = await (await fetch(`${base}/${V}/debug_token?input_token=${encodeURIComponent(tok)}`, { headers: { authorization: 'Bearer ' + tok } })).json();
-        const ids = new Set(); for (const g of ((d.data && d.data.granular_scopes) || [])) if (/whatsapp/.test(g.scope)) for (const t of (g.target_ids || [])) ids.add(t);
+        const g = async (path) => { const x = await (await fetch(`${base}/${V}/${path}`, { headers: { authorization: 'Bearer ' + tok } })).json(); if (x.error) throw new Error(path.split('?')[0] + ': ' + x.error.message); return x; };
+        const wabas = new Set();
+        const d = await g(`debug_token?input_token=${encodeURIComponent(tok)}`).catch(() => ({}));
+        for (const s of ((d.data && d.data.granular_scopes) || [])) if (/whatsapp/.test(s.scope)) for (const t of (s.target_ids || [])) wabas.add(t);
+        let biz = '';
+        try { const me = await g(`${String(E.PHONE_NUMBER_ID).trim()}?fields=id`); void me; } catch {}
+        for (const w of [...wabas]) { try { const o = await g(`${w}?fields=owner_business_info`); if (o.owner_business_info) biz = o.owner_business_info.id; break; } catch {} }
+        if (E.WABA_ID) wabas.add(String(E.WABA_ID).trim());
+        if (!biz && E.WABA_ID) { try { const o = await g(`${String(E.WABA_ID).trim()}?fields=owner_business_info`); biz = (o.owner_business_info || {}).id || ''; } catch (e) { out.whatsapp_debug = String(e.message).slice(0, 160); } }
+        if (biz) { for (const edge of ['owned_whatsapp_business_accounts', 'client_whatsapp_business_accounts']) { try { const l = await g(`${biz}/${edge}?fields=id,name`); for (const w of (l.data || [])) wabas.add(w.id); } catch (e) { out.whatsapp_debug = String(e.message).slice(0, 160); } } }
         out.whatsapp_numbers = [];
-        for (const w of [...ids].slice(0, 6)) {
-          const pn = await (await fetch(`${base}/${V}/${w}/phone_numbers?fields=display_phone_number,verified_name,platform_type,code_verification_status,is_on_biz_app`, { headers: { authorization: 'Bearer ' + tok } })).json();
-          for (const n of (pn.data || [])) out.whatsapp_numbers.push({ number: n.display_phone_number, name: n.verified_name, phone_number_id: n.id, waba: w, platform: n.platform_type, on_business_app: !!n.is_on_biz_app });
+        for (const w of [...wabas].slice(0, 8)) {
+          try {
+            const pn = await g(`${w}/phone_numbers?fields=display_phone_number,verified_name,platform_type,is_on_biz_app`);
+            for (const n of (pn.data || [])) out.whatsapp_numbers.push({ number: n.display_phone_number, name: n.verified_name, phone_number_id: n.id, waba: w, platform: n.platform_type, on_business_app: !!n.is_on_biz_app });
+          } catch (e) { out.whatsapp_debug = String(e.message).slice(0, 160); }
         }
-      } catch {}
+        if (!wabas.size) out.whatsapp_numbers_hint = 'أضف WABA_ID في Vercel (معرف حساب واتساب للأعمال) عشان نعرض الأرقام';
+      } catch (e) { out.whatsapp_debug = String(e.message).slice(0, 160); }
       out.whatsapp = r.ok ? `متصل ✓ ${j.display_phone_number || ''} ${j.verified_name ? '(' + j.verified_name + ')' : ''}`.trim() : 'خطأ من Meta: ' + String((j.error && j.error.message) || r.status).slice(0, 200);
     } catch (err) { out.whatsapp = 'فشل الاتصال بـ Meta: ' + String(err.message).slice(0, 120); }
   }
