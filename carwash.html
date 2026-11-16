@@ -315,9 +315,10 @@ var role='customer', meId=null, flipped=false, draft={step:1,name:'',phone:'',ty
 var orders=[], custView='card', ord={pkg:'full',addons:[]}, curOrder=null, paying=false, myOrderSeen={};
 var PKGS=[['ext','غسيل خارجي','بخار وشامبو وتنشيف',25],['full','خارجي + داخلي','الأرضيات والطبلون والزجاج من داخل',45],['vip','غسيل كامل + تلميع','تلميع البودي والإطارات ومعطر',120]];
 var ADDONS=[['eng','تنظيف المحرك',30],['scent','معطر فاخر',10]];
-var STATUS={unpaid:'بانتظار الدفع',paid:'مدفوع',washing:'جاري الغسيل',done:'جاهزة'};
+var STATUS={pending:'بانتظار الدفع',unpaid:'بانتظار الدفع',paid:'مدفوع',washing:'جاري الغسيل',done:'جاهزة'};
 var walk=null;
-function isPaid(o){return o.status!=='unpaid';}
+function isPaid(o){return o.status!=='unpaid'&&o.status!=='pending';}
+var payInfo={mode:'demo'};
 function channel(o){return o.method==='كاش'?'كاش':o.method==='شبكة'?'شبكة':o.method==='في المغسلة'?'بانتظار الدفع':'أونلاين';}
 var GAP_MIN=60;
 function gapLabel(){var g=gapMin();return g>=1440?'يوم':g>=180?'٣ ساعات':'ساعة';}
@@ -365,7 +366,7 @@ var tokStaff=null, tokOwner=null, tokCust={};
 try{tokStaff=sessionStorage.getItem('lamaa-st');tokOwner=sessionStorage.getItem('lamaa-ot');tokCust=JSON.parse(localStorage.getItem('lamaa-ct')||'{}')||{};}catch(e){}
 function saveToks(){try{ if(tokStaff) sessionStorage.setItem('lamaa-st',tokStaff); else sessionStorage.removeItem('lamaa-st'); if(tokOwner) sessionStorage.setItem('lamaa-ot',tokOwner); else sessionStorage.removeItem('lamaa-ot'); localStorage.setItem('lamaa-ct',JSON.stringify(tokCust)); }catch(e){}}
 function auth(){ var c=[]; if(meId&&tokCust[meId]) c.push(tokCust[meId]); return {staff:tokStaff||undefined,owner:tokOwner||undefined,cust:c}; }
-function apply(st){ if(!st||!st.members) return false; var sig=JSON.stringify([st.members,st.orders,st.ratings,st.feed,st.config]); if(sig===lastSig) return false; lastSig=sig; members=st.members; orders=st.orders||[]; ratings=st.ratings||[]; feed=st.feed||{items:[],days:{}}; config=st.config||config; return true; }
+function apply(st){ if(!st||!st.members) return false; var sig=JSON.stringify([st.members,st.orders,st.ratings,st.feed,st.config]); if(sig===lastSig) return false; lastSig=sig; members=st.members; orders=st.orders||[]; ratings=st.ratings||[]; feed=st.feed||{items:[],days:{}}; config=st.config||config; payInfo=st.pay||payInfo; return true; }
 function post(body){ body.auth=auth(); return fetch(API+'op',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){ if(!r.ok){ j=j||{}; j.status=r.status; if(j.state) apply(j.state); throw j; } return j; });}); }
 function op(name,data){
   return post({op:name,data:data||{}}).then(function(st){ apply(st); mineChanged(); ordersChanged(); render(); return st; })
@@ -389,7 +390,7 @@ function poll(){
   }).catch(function(){ setLive(false,'ما قدرنا نوصل للخادم، نحاول مرة ثانية…'); }).then(function(){ pollT=setTimeout(poll,3000); });
 }
 document.addEventListener('visibilitychange',function(){ if(!document.hidden) poll(); });
-function connect(){ var h=(location.hash||'').slice(1); if(h==='staff'||h==='owner'||h==='customer') role=h; render(); poll(); }
+function connect(){ var h=(location.hash||'').slice(1); if(h==='staff'||h==='owner'||h==='customer') role=h; render(); poll(); setTimeout(payReturn,600); }
 function mineChanged(){
   var m=meId&&members[meId]; if(!m){ prevMine=null; return; }
   if(prevMine && role==='customer'){
@@ -413,9 +414,9 @@ function passBack(m){
   return '<div class="back"><div class="r row" style="justify-content:space-between"><b>مغسلة لمعة</b><span style="font-size:12px;color:#56646F">تفاصيل البطاقة</span></div><div class="r"><div class="k">كيف تشتغل</div>كل غسلة تاخذ ختم. '+need()+' أختام = غسلة كاملة مجانًا.</div><div class="r"><div class="k">إجمالي غسلاتك</div>'+m.total+' غسلة · '+m.rewards+' مكافأة مستلمة</div><div class="r"><div class="k">عضو من</div>'+esc(dateLabel(m.joined))+'</div><div class="r"><div class="k">المستويات</div>فضي من أول غسلة · ذهبي بعد ٢٠ غسلة</div><div class="r"><div class="k">المتعلقات الشخصية</div><span style="font-size:13px;color:#56646F">'+esc(disc())+'</span></div><div class="r"><div class="k">الشروط</div><span style="font-size:13px;color:#56646F">ختم واحد لكل سيارة في اليوم. الأختام صالحة ١٢ شهر.</span></div></div>';
 }
 function trackHtml(o){
-  var st=['paid','washing','done'], k=o.status==='unpaid'?-1:st.indexOf(o.status), h='';
+  var st=['paid','washing','done'], k=(o.status==='unpaid'||o.status==='pending')?-1:st.indexOf(o.status), h='';
   if(o.status==='unpaid') h='';
-  st.forEach(function(x,i){ if(i) h+='<span class="ln'+(i<=k?' on':'')+'" aria-hidden="true"></span>'; h+='<div class="s'+(i<=k?' on':'')+(i===k&&o.status!=='done'?' now':'')+'"><span class="c">'+(i<k||o.status==='done'?'✓':i+1)+'</span>'+(x==='paid'&&o.status==='unpaid'?'بانتظار الدفع':STATUS[x])+'</div>'; });
+  st.forEach(function(x,i){ if(i) h+='<span class="ln'+(i<=k?' on':'')+'" aria-hidden="true"></span>'; h+='<div class="s'+(i<=k?' on':'')+(i===k&&o.status!=='done'?' now':'')+'"><span class="c">'+(i<k||o.status==='done'?'✓':i+1)+'</span>'+(x==='paid'&&!isPaid(o)?'بانتظار الدفع':STATUS[x])+'</div>'; });
   return '<div class="track" aria-label="حالة الطلب: '+STATUS[o.status]+'">'+h+'</div>';
 }
 function invoiceHtml(o){
@@ -434,12 +435,12 @@ function vOrder(m){
   return '<div class="col"><div class="panel stack"><div class="row" style="justify-content:space-between"><h2>اطلب غسلة</h2><button class="btn ghost sm" id="toCard" type="button">رجوع</button></div><div class="row muted small"><span class="carchip">'+carSvg(m.type,m.color,58,24)+'</span>'+esc(m.type)+' · الأسعار تجريبية وشاملة الضريبة</div><div class="pkgs">'+pkgs+'</div><div><b class="small">إضافات</b>'+ad+'</div>'+
    '<div class="row" style="justify-content:space-between;font-size:17px"><b>الإجمالي</b><b style="font-family:var(--display);font-variant-numeric:tabular-nums">'+money(total)+'</b></div>'+
    '<div class="discl"><div class="row" style="gap:8px;align-items:flex-start"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8A6410" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:2px"><path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17h.01"/></svg><div><b>إخلاء مسؤولية المتعلقات الشخصية</b><p style="margin:4px 0 0">'+esc(disc())+'</p></div></div><label class="addon" for="agree" style="margin-top:6px"><input type="checkbox" id="agree"'+(agreed?' checked':'')+'><span style="flex:1;font-weight:600">أقر إني أخرجت متعلقاتي الشخصية من السيارة</span></label></div>'+
-   '<button class="btn black" data-pay="Apple Pay" type="button"'+(agreed?'':' disabled')+'><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.9-.8-3.1-.8-1.6 0-3 .9-3.9 2.3-1.7 2.9-.4 7.1 1.2 9.4.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.6s-2.4-1-2.3-3.8zM14.1 5.6c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.7-1.3z"/></svg>ادفع بـ Apple Pay</button><button class="btn primary" data-pay="مدى" type="button"'+(agreed?'':' disabled')+'>ادفع بمدى أو بطاقة</button><button class="btn ghost" data-pay="store" type="button"'+(agreed?'':' disabled')+'><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>ادفع في المغسلة: كاش أو شبكة</button><p class="muted small" style="margin:0;text-align:center">الدفع الإلكتروني تجريبي. في النظام الحقيقي يمر عن طريق بوابة دفع مثل ميسّر أو تاب.</p></div></div>';
+   '<button class="btn black" data-pay="Apple Pay" type="button"'+(agreed?'':' disabled')+'><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="#fff"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.1-2.8.9-3.5.9-.7 0-1.9-.8-3.1-.8-1.6 0-3 .9-3.9 2.3-1.7 2.9-.4 7.1 1.2 9.4.8 1.1 1.7 2.4 2.9 2.3 1.2 0 1.6-.7 3-.7s1.8.7 3 .7c1.3 0 2.1-1.1 2.8-2.3.9-1.3 1.3-2.6 1.3-2.6s-2.4-1-2.3-3.8zM14.1 5.6c.6-.8 1.1-1.9 1-3-.9 0-2.1.6-2.7 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.7-1.3z"/></svg>ادفع بـ Apple Pay</button><button class="btn primary" data-pay="مدى" type="button"'+(agreed?'':' disabled')+'>ادفع بمدى أو بطاقة</button><button class="btn ghost" data-pay="store" type="button"'+(agreed?'':' disabled')+'><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg>ادفع في المغسلة: كاش أو شبكة</button><p class="muted small" style="margin:0;text-align:center">'+(payInfo.mode==='moyasar'?'الدفع الإلكتروني آمن عن طريق ميسّر، وبيانات بطاقتك ما تمر على المغسلة.':'الدفع الإلكتروني تجريبي. في النظام الحقيقي يمر عن طريق بوابة دفع مثل ميسّر أو تاب.')+'</p></div></div>';
 }
 function vCustomer(){
   var m=meId&&members[meId];
   if(m&&custView==='order') return vOrder(m);
-  if(m&&custView==='invoice'&&curOrder){ var o=orders.filter(function(x){return x.id===curOrder;})[0]; if(o) return '<div class="col"><div class="panel stack"><div class="row" style="justify-content:space-between"><h2>'+(o.status==='done'?'سيارتك جاهزة':o.status==='unpaid'?'طلبك جاهز للدفع':'تم الدفع')+'</h2><button class="btn ghost sm" id="toCard" type="button">البطاقة</button></div>'+trackHtml(o)+'<p class="muted small" style="margin:0">'+(o.status==='unpaid'?'ادفع للموظف كاش أو شبكة، وتطلع لك الفاتورة هنا تلقائيًا':o.status==='paid'?'اعرض رقم الطلب للموظف، أو انتظر لين يبدأ':(o.status==='washing'?'الموظف يغسل سيارتك الحين':'انضاف ختم لبطاقتك. نتمنى تعجبك الغسلة'))+'</p></div>'+invoiceHtml(o)+'</div>'; }
+  if(m&&custView==='invoice'&&curOrder){ var o=orders.filter(function(x){return x.id===curOrder;})[0]; if(o) return '<div class="col"><div class="panel stack"><div class="row" style="justify-content:space-between"><h2>'+(o.status==='done'?'سيارتك جاهزة':!isPaid(o)?'طلبك جاهز للدفع':'تم الدفع')+'</h2><button class="btn ghost sm" id="toCard" type="button">البطاقة</button></div>'+trackHtml(o)+'<p class="muted small" style="margin:0">'+(o.status==='pending'?'أكمل الدفع الإلكتروني، وتطلع لك الفاتورة هنا':o.status==='unpaid'?'ادفع للموظف كاش أو شبكة، وتطلع لك الفاتورة هنا تلقائيًا':o.status==='paid'?'اعرض رقم الطلب للموظف، أو انتظر لين يبدأ':(o.status==='washing'?'الموظف يغسل سيارتك الحين':'انضاف ختم لبطاقتك. نتمنى تعجبك الغسلة'))+'</p>'+(o.status==='pending'?'<div class="mysr-form" id="mysr"></div><button class="btn primary" id="payNow" data-order="'+esc(o.id)+'" type="button">أكمل الدفع '+money(o.total)+'</button>':'')+'</div>'+invoiceHtml(o)+'</div>'; }
   if(!m){
     var d=draft, types=Object.keys(CARS).map(function(k){var c=CARS[k];return '<button type="button" data-type="'+esc(k)+'" aria-pressed="'+(d.type===k)+'"><svg aria-hidden="true" viewBox="0 0 120 50"><path d="'+c.b+'" fill="currentColor"/><circle cx="'+c.w[0]+'" cy="38" r="7" fill="currentColor" stroke="var(--surface)" stroke-width="2"/><circle cx="'+c.w[1]+'" cy="38" r="7" fill="currentColor" stroke="var(--surface)" stroke-width="2"/></svg>'+esc(k)+'</button>';}).join('');
     var colors=COLORS.map(function(c){return '<button type="button" data-color="'+c[1]+'" aria-label="'+c[0]+'" aria-pressed="'+(d.color===c[1])+'" style="background:'+c[1]+'"></button>';}).join('');
@@ -488,7 +489,7 @@ function vStaff(){
       '<p class="small muted" style="margin:0">تذكير: نبّه الزبون يخرج متعلقاته الشخصية قبل الغسيل.</p>'+(done?'<button class="btn gold" id="redeem" type="button">سلّم الغسلة المجانية</button>':'<button class="btn aqua" id="stamp" type="button"'+(wait?' disabled':'')+'><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#0A2540" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+GUN+'</svg>أضف ختم</button>')+
       (walk&&walk.id===m.id?walkHtml(m):'<button class="btn ghost" id="walkOpen" type="button">بيع غسلة في المحل (كاش أو شبكة)</button>')+'<button class="btn ghost sm" id="clearSel" type="button">إغلاق</button></div>';
   }
-  var queue=orders.filter(function(o){return o.status!=='done';}).sort(function(a,b){return a.at.localeCompare(b.at);});
+  var queue=orders.filter(function(o){return o.status!=='done'&&o.status!=='pending';}).sort(function(a,b){return a.at.localeCompare(b.at);});
   var qh=queue.map(function(o){var mm=members[o.member];return '<div class="ord"><div class="carchip">'+(mm?carSvg(mm.type,mm.color,58,24):'')+'</div><div style="flex:1;min-width:0"><b class="small">'+esc(o.name)+' · '+esc(o.no)+'</b><div class="muted small">'+esc(o.items.map(function(i){return i[0];}).join(' + '))+' · <b style="font-variant-numeric:tabular-nums">'+money(o.total)+'</b>'+(o.status==='unpaid'?' · <span style="color:var(--danger)">لم يُدفع</span>':' · '+esc(channel(o)))+'</div>'+(o.agreed?'<span class="chip ok" style="margin-top:4px">أقر بإخراج المتعلقات ✓</span>':'<span class="chip gold" style="margin-top:4px">تأكد من المتعلقات مع الزبون</span>')+'</div>'+(o.status==='unpaid'?'<div class="row" style="gap:6px;flex-shrink:0"><button class="btn primary sm" data-paid="'+esc(o.id)+'|كاش" type="button">كاش</button><button class="btn primary sm" data-paid="'+esc(o.id)+'|شبكة" type="button">شبكة</button></div>':o.status==='paid'?'<button class="btn aqua sm" data-start="'+esc(o.id)+'" type="button">ابدأ</button>':'<button class="btn gold sm" data-finish="'+esc(o.id)+'" type="button">جاهزة</button>')+'</div>';}).join('');
   var queuePanel='<div class="panel"><div class="row" style="justify-content:space-between"><h3>الطلبات</h3><span class="chip '+(queue.length?'gold':'n')+'">'+queue.length+'</span></div>'+(qh||'<p class="muted small" style="margin:6px 0 0">ما فيه طلبات الحين</p>')+'</div>';
   var q=normPhone(search), ql=search.trim();
@@ -614,6 +615,7 @@ $('view').addEventListener('click',function(e){
     case 'toCard': custView='card'; render(); break;
     case 'skipRate': skipRating(); break;
     case 'redeem': redeem(); break;
+    case 'payNow': openPayForm(t.dataset.order); break;
     case 'ownerOut': tokOwner=null; saveToks(); render(); break;
   }
 });
@@ -672,12 +674,36 @@ function pay(method){
     op('order',data).then(function(st){ var id=st.issued&&st.issued.order; if(id){ myOrderSeen[id]='unpaid'; curOrder=id; custView='invoice'; render(); } sfx('pop'); toast('طلبك وصل للموظف. ادفع له كاش أو شبكة'); }).catch(function(){});
     return;
   }
+  if(payInfo.mode==='moyasar'){
+    data.method='online';
+    op('order',data).then(function(st){ var id=st.issued&&st.issued.order; if(id){ myOrderSeen[id]='pending'; curOrder=id; custView='invoice'; render(); openPayForm(id); } }).catch(function(){});
+    return;
+  }
   paying=true; render();
   setTimeout(function(){
     op('order',data).then(function(st){ paying=false; var id=st.issued&&st.issued.order; var o=orders.filter(function(x){return x.id===id;})[0];
       if(id){ myOrderSeen[id]='paid'; curOrder=id; custView='invoice'; } render(); sfx('chime'); if(o){ celebrate('تم الدفع',money(o.total)+' · فاتورتك جاهزة'); toast('تم الدفع '+money(o.total)+'. فاتورتك جاهزة'); }
     }).catch(function(){ paying=false; render(); });
   },1300);
+}
+function loadMoyasar(){
+  if(window.Moyasar) return Promise.resolve();
+  return new Promise(function(res,rej){ var l=document.createElement('link'); l.rel='stylesheet'; l.href='/vendor/moyasar.css'; document.head.appendChild(l);
+    var sc=document.createElement('script'); sc.src='/vendor/moyasar.js'; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); });
+}
+function openPayForm(id){
+  var o=orders.filter(function(x){return x.id===id;})[0]; if(!o||payInfo.mode!=='moyasar') return;
+  loadMoyasar().then(function(){
+    var el=$('mysr'); if(!el) return; var b=$('payNow'); if(b) b.hidden=true;
+    window.Moyasar.init({ element:'#mysr', amount:Math.round(o.total*100), currency:'SAR', description:'مغسلة لمعة '+o.no, publishable_api_key:payInfo.key,
+      callback_url:location.origin+'/carwash?order='+encodeURIComponent(o.id), methods:['creditcard','applepay'], metadata:{order:o.id},
+      apple_pay:{country:'SA',label:'Lamaa Car Wash',validate_merchant_url:'https://api.moyasar.com/v1/applepay/initiate'} });
+  },function(){ toast('ما قدرنا نفتح صفحة الدفع، جرّب مرة ثانية'); });
+}
+function payReturn(){
+  var q=new URLSearchParams(location.search), oid=q.get('order'), pid=q.get('id'); if(!oid||!pid) return;
+  history.replaceState(null,'',location.pathname+location.hash);
+  post({op:'confirmPay',data:{order:oid,paymentId:pid}}).then(function(st){ apply(st); curOrder=oid; custView='invoice'; render(); sfx('chime'); celebrate('تم الدفع','فاتورتك جاهزة'); },function(e){ toast((e&&e.error)||'ما تأكدنا من الدفع'); curOrder=oid; custView='invoice'; render(); });
 }
 function markPaid(id,method){
   var o=orders.filter(function(x){return x.id===id;})[0]; if(!o) return;
