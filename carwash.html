@@ -23,15 +23,10 @@
   --bg:#EDF1F4; --surface:#FFFFFF; --surface2:#F5F8FA; --ink:#101C26; --muted:#56646F; --line:#DCE3E9;
   --brand:#0A2540; --brand-ink:#FFFFFF; --aqua:#5CD3F0; --aqua-ink:#0A2540; --gold:#F2C14E;
   --ok:#17804D; --ok-bg:#E2F4EA; --gold-bg:#FFF3D3; --gold-ink:#7A5608; --danger:#C0303A;
-  --wallet:#111214;
+  --wallet:#E4EAF0; color-scheme:light;
   --display:'Readex Pro','IBM Plex Sans Arabic',system-ui,sans-serif;
   --body:'IBM Plex Sans Arabic',system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;
 }
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0B1117; --surface:#141D26; --surface2:#1A2531; --ink:#E6EDF3; --muted:#9AA8B5; --line:#253240;
-  --brand:#5CD3F0; --brand-ink:#0A2540; --ok:#5ACF8E; --ok-bg:#14301F; --gold-bg:#30270F; --gold-ink:#F2C14E; --danger:#FF7A82; --wallet:#000; color-scheme:dark}}
-:root[data-theme="dark"]{--bg:#0B1117; --surface:#141D26; --surface2:#1A2531; --ink:#E6EDF3; --muted:#9AA8B5; --line:#253240;
-  --brand:#5CD3F0; --brand-ink:#0A2540; --ok:#5ACF8E; --ok-bg:#14301F; --gold-bg:#30270F; --gold-ink:#F2C14E; --danger:#FF7A82; --wallet:#000; color-scheme:dark}
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6}
 .wrap{max-width:1120px;margin:0 auto;padding-block:18px 40px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
@@ -83,9 +78,9 @@ textarea{padding:10px 14px;resize:vertical;min-height:84px}
 .stage{background:linear-gradient(180deg,#123B63,#0D2E4F);border-radius:16px;padding:12px 0 6px;display:flex;flex-direction:column;align-items:center;color:#CFE3F2;font-size:12px}
 /* wallet */
 .wallet{background:var(--wallet);border-radius:26px;padding:16px 14px 18px;display:flex;flex-direction:column;gap:12px}
-.wallet .wh{display:flex;justify-content:space-between;align-items:center;color:#fff;padding:0 4px}
+.wallet .wh{display:flex;justify-content:space-between;align-items:center;color:var(--ink);padding:0 4px}
 .wallet .wh b{font-family:var(--display);font-size:22px}
-.pass{width:100%;border-radius:16px;overflow:hidden;background:#0A2540;color:#fff;box-shadow:0 10px 28px rgba(0,0,0,.35)}
+.pass{width:100%;border-radius:16px;overflow:hidden;background:#0A2540;color:#fff;box-shadow:0 12px 30px rgba(10,37,64,.28)}
 .pass .hd{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px}
 .pass .lbl{font-size:10px;font-weight:600;color:#5CD3F0;letter-spacing:.6px}
 .pass .big{font-family:var(--display);font-size:22px;font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums}
@@ -393,7 +388,7 @@ function vCustomer(){
   var actPanel=act?'<div class="panel stack"><div class="row" style="justify-content:space-between"><h3>طلبك '+esc(act.no)+'</h3><button class="btn ghost sm" data-inv="'+esc(act.id)+'" type="button">الفاتورة</button></div>'+trackHtml(act)+'</div>':'<button class="btn aqua" id="toOrder" type="button">اطلب غسلة وادفع من جوالك</button>';
   var invList=mine.slice(0,4).map(function(o){return '<div class="ord"><div style="flex:1;min-width:0"><b class="small">'+esc(o.items[0][0])+'</b><div class="muted small">'+esc(dateLabel(o.at))+' · '+esc(o.no)+'</div></div><b class="small" style="font-variant-numeric:tabular-nums">'+money(o.total)+'</b><button class="btn ghost sm" data-inv="'+esc(o.id)+'" type="button">عرض</button></div>';}).join('');
   var visits=(m.visits||[]).slice(-5).reverse().map(function(v){return '<div><span>غسلة</span><time>'+esc(dateLabel(v))+' · '+esc(timeLabel(v))+'</time></div>';}).join('');
-  return '<div class="col">'+ratePanel+actPanel+'<div class="wallet"><div class="wh"><b>المحفظة</b><button class="btn sm" id="flip" type="button" style="background:#2A2C31;color:#fff">'+(flipped?'الوجه الأمامي':'التفاصيل')+'</button></div>'+(flipped?passBack(m):passFront(m))+'</div>'+
+  return '<div class="col">'+ratePanel+actPanel+'<div class="wallet"><div class="wh"><b>المحفظة</b><button class="btn sm" id="flip" type="button" style="background:#fff;color:var(--ink);border:1px solid var(--line)">'+(flipped?'الوجه الأمامي':'التفاصيل')+'</button></div>'+(flipped?passBack(m):passFront(m))+'</div>'+
     '<div class="panel stack"><div class="row" style="justify-content:space-between"><h3>آخر زياراتك</h3><span class="chip n">'+m.total+' غسلة</span></div><div class="visits">'+(visits||'<span class="muted small">أول زيارة بتظهر هنا</span>')+'</div></div>'+
     (invList?'<div class="panel"><h3>فواتيري</h3>'+invList+'</div>':'')+'<p class="muted small" style="text-align:center;margin:0">اعرض الـ QR للموظف مع كل غسلة. للتجربة: افتح «الموظف» على جهاز ثاني وامسح الكود.</p><button class="btn ghost" id="leave" type="button">سجّل زبون ثاني على هذا الجهاز</button></div>';
 }
