@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>حسابي · شاهين ديزاين</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Readex+Pro:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="/apps/kit.css?v=1">
+<style>:root{--accent:#8C6A36;--bg:#F5F3EF}.mark{width:42px;height:42px;border-radius:13px;background:#1D1D1F;color:#EAD7B2;display:grid;place-items:center;font-family:var(--display);font-weight:600}</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="/vendor/qrcode.js"></script>
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+  var E = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return MAP[c]; }); };
+  var LS = { get: function (k, d) { try { var v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } }, set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }, del: function (k) { try { localStorage.removeItem(k); } catch (e) {} } };
+  var WA = '966582409776', S = { sess: LS.get('sd-app', null), me: null, admin: null, kinds: {}, made: null };
+  var STATUS = { active: ['فعّال', 'ok'], invited: ['بانتظار التفعيل', 'warn'], suspended: ['موقوف', 'bad'] };
+  function api(path, body) {
+    return fetch('/api/platform/' + path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body || {}) })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) throw { status: r.status, error: j.error || 'صار خطأ' }; return j; }); });
+  }
+  function toast(m) { var t = document.querySelector('.toast'); if (t) t.remove(); t = document.createElement('div'); t.className = 'toast'; t.textContent = m; document.body.appendChild(t); setTimeout(function () { t.remove(); }, 3500); }
+  function qr(text) { var q = qrcode(0, 'M'); q.addData(text); q.make(); var n = q.getModuleCount(), p = ''; for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) p += 'M' + c + ' ' + r + 'h1v1h-1z'; return '<svg viewBox="-2 -2 ' + (n + 4) + ' ' + (n + 4) + '" shape-rendering="crispEdges"><rect x="-2" y="-2" width="' + (n + 4) + '" height="' + (n + 4) + '" fill="#fff"/><path d="' + p + '" fill="#1C1A18"/></svg>'; }
+  function dateAr(iso) { try { return new Date(iso).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) { return iso; } }
+  function daysLeft(iso) { return Math.ceil((Date.parse(iso) - Date.now()) / 864e5); }
+  var top = function (sub) { return '<header class="top"><a class="brand" href="/" style="text-decoration:none;color:inherit"><div class="mark">ش</div><div><b>شاهين ديزاين</b><small>' + E(sub) + '</small></div></a></header>'; };
+
+  // ---------- views ----------
+  function vActivate(code) {
+    return top('تفعيل الحساب') + '<div class="col"><form class="panel stack" id="act"><h2>فعّل حسابك</h2><p class="muted small">اختر كلمة مرور لحسابك. بتستخدمها كل ما تدخل لوحة نظامك.</p><label class="f">كلمة المرور<input name="password" type="password" minlength="8" required autocomplete="new-password"></label><label class="f">أعد كتابتها<input name="password2" type="password" minlength="8" required autocomplete="new-password"></label><p class="err" id="err" hidden></p><button class="btn block">تفعيل</button></form></div>';
+  }
+  function vLogin() {
+    return top('دخول المشتركين') + '<div class="col"><form class="panel stack" id="login"><h2>دخول حسابك</h2><label class="f">اسم الحساب<input name="slug" class="ltr" required autocomplete="username" placeholder="مثلًا: sana-cafe" value="' + E(S.sess ? S.sess.slug : '') + '"></label><label class="f">كلمة المرور<input name="password" type="password" required autocomplete="current-password"></label><p class="err" id="err" hidden></p><button class="btn block">دخول</button><p class="small muted">نسيت كلمة المرور؟ <a href="https://wa.me/' + WA + '?text=' + encodeURIComponent('أبغى رابط تفعيل جديد لحسابي') + '" style="color:var(--accent)">تواصل معنا</a></p></form><p class="foot"><a href="/demos">شوف الأنظمة المتاحة</a> · <a href="#admin">إدارة الاشتراكات</a></p></div>';
+  }
+  function vDash() {
+    var m = S.me, t = m.tenant, link = location.origin + '/s/' + t.slug, st = STATUS[t.status] || ['', ''], left = daysLeft(t.until);
+    var renew = 'https://wa.me/' + WA + '?text=' + encodeURIComponent('أبغى أجدد اشتراك ' + t.name + ' (' + t.slug + ')');
+    var html = top('حساب المشترك') + '<div class="stack" style="max-width:920px;margin:0 auto">';
+    html += '<section class="hero" style="--accent:' + E(m.brand.color) + '"><span class="tiny" style="opacity:.85">' + E(m.title) + '</span><h1>' + E(m.brand.name) + '</h1><div class="row wrap2" style="margin-top:10px"><span class="chip" style="background:rgba(255,255,255,.2);color:#fff;border:0">' + st[0] + '</span><span class="chip" style="background:rgba(255,255,255,.2);color:#fff;border:0">' + (left > 0 ? 'الاشتراك حتى ' + dateAr(t.until) + ' · باقي ' + left + ' يوم' : 'الاشتراك انتهى') + '</span></div></section>';
+    if (left <= 10) html += '<div class="panel soft row between wrap2"><b>' + (left > 0 ? 'اشتراكك قرب ينتهي' : 'اشتراكك منتهي، وصفحتك متوقفة عن العملاء') + '</b><a class="btn sm" href="' + renew + '" target="_blank" rel="noopener">جدّد الاشتراك</a></div>';
+    html += '<div class="stats">' + m.stats.map(function (s) { return '<div class="stat"><small>' + E(s[0]) + '</small><b>' + E(s[1]) + '</b></div>'; }).join('') + '</div>';
+    var ic = function (p) { return '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>'; };
+    html += '<div class="split"><div class="stack">' +
+      '<a class="panel item" style="text-decoration:none;color:inherit" href="/s/' + E(t.slug) + '#owner"><div class="av">' + ic('<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>') + '</div><div class="grow"><b>لوحة الإدارة</b><div class="small muted">الإحصائيات، الإعدادات، الفريق، الهوية</div></div><span aria-hidden="true">←</span></a>' +
+      '<a class="panel item" style="text-decoration:none;color:inherit" href="/s/' + E(t.slug) + '#staff"><div class="av">' + ic('<circle cx="9" cy="8.5" r="3"/><path d="M3.5 19c.8-3.4 3-4.8 5.5-4.8s4.7 1.4 5.5 4.8"/><path d="M16 6.5a3 3 0 0 1 0 5.5M18 19c-.3-1.8-1-3-2-3.8"/>') + '</div><div class="grow"><b>صفحة الموظفين</b><div class="small muted">افتحها على جهاز المحل، كل موظف يدخل برمزه</div></div><span aria-hidden="true">←</span></a>' +
+      '<a class="panel item" style="text-decoration:none;color:inherit" href="/s/' + E(t.slug) + '"><div class="av">' + ic('<rect x="4" y="4" width="6" height="6" rx="1"/><rect x="14" y="4" width="6" height="6" rx="1"/><rect x="4" y="14" width="6" height="6" rx="1"/><path d="M14 14h2v2h-2zM18 18h2v2h-2z"/>') + '</div><div class="grow"><b>صفحة عملائك</b><div class="small muted">اللي يشوفها العميل لما يمسح الرمز</div></div><span aria-hidden="true">←</span></a>' +
+      '<form class="panel stack" id="pw"><h3>تغيير كلمة المرور</h3><input name="old" type="password" required placeholder="الحالية" autocomplete="current-password"><input name="password" type="password" minlength="8" required placeholder="الجديدة (٨ أو أكثر)" autocomplete="new-password"><button class="btn sm">حفظ</button></form></div>' +
+      '<div class="panel stack" style="text-align:center"><h2>رابط ورمز عملائك</h2><p class="small muted">اطبع الرمز وحطه في المحل أو شاركه في حساباتك</p><div><div class="qrbox">' + qr(link) + '</div></div><p class="ltr small" style="word-break:break-all">' + E(link) + '</p><div class="row" style="justify-content:center"><button class="btn sm ghost" id="copy">نسخ الرابط</button><button class="btn sm ghost" onclick="print()">طباعة</button></div></div></div>';
+    html += '<p class="foot"><a href="' + renew + '" target="_blank" rel="noopener">الدعم والتجديد</a> · <a href="#" id="out">تسجيل خروج</a></p></div>';
+    return html;
+  }
+  function vAdmin() {
+    var a = S.admin;
+    if (!a) return top('إدارة الاشتراكات') + '<div class="col"><div class="panel stack"><h2>إدارة الاشتراكات</h2><p class="muted">هذي الصفحة لشاهين ديزاين. سجّل دخولك في لوحة التحكم أول، وبعدها ارجع هنا.</p><a class="btn" href="/admin">دخول لوحة التحكم</a><a class="btn ghost" href="#">رجوع</a></div></div>';
+    var kinds = a.kinds, html = top('إدارة الاشتراكات') + '<div class="stack">';
+    var count = function (s) { return a.tenants.filter(function (t) { return t.status === s; }).length; };
+    html += '<div class="stats"><div class="stat"><small>كل المشتركين</small><b>' + a.tenants.length + '</b></div><div class="stat"><small>فعّال</small><b>' + count('active') + '</b></div><div class="stat"><small>بانتظار التفعيل</small><b>' + count('invited') + '</b></div><div class="stat"><small>ينتهي خلال ١٠ أيام</small><b>' + a.tenants.filter(function (t) { var l = daysLeft(t.until); return l > 0 && l <= 10; }).length + '</b></div></div>';
+    html += '<div class="dash"><section class="panel"><div class="row between"><h2>المشتركين</h2><a class="btn xs ghost" href="/demos" target="_blank">التجارب الحية</a></div>' + (a.tenants.length ? '<div class="tablewrap" style="margin-top:10px"><table class="t"><thead><tr><th>النشاط</th><th>النظام</th><th>الحالة</th><th>ينتهي</th><th></th></tr></thead><tbody>' + a.tenants.slice().reverse().map(function (t) {
+      var st = STATUS[t.status] || ['', '']; var l = daysLeft(t.until);
+      return '<tr><td><b>' + E(t.name) + '</b><div class="tiny muted ltr" style="text-align:right">/s/' + E(t.slug) + (t.phone ? ' · ' + E(t.phone) : '') + '</div>' + (t.note ? '<div class="tiny muted">' + E(t.note) + '</div>' : '') + '</td><td class="small">' + E(kinds[t.kind] || t.kind) + '</td><td><span class="chip ' + st[1] + '">' + st[0] + '</span></td><td class="small' + (l <= 10 ? '" style="color:var(--danger)' : '') + '">' + dateAr(t.until) + '<div class="tiny muted">' + (l > 0 ? 'باقي ' + l + ' يوم' : 'منتهي') + '</div></td><td><div class="row wrap2" style="gap:4px"><select data-x="extend" data-slug="' + E(t.slug) + '" style="min-height:34px;width:auto;font-size:12.5px"><option value="">تمديد…</option><option value="1">شهر</option><option value="3">٣ أشهر</option><option value="6">٦ أشهر</option><option value="12">سنة</option></select>' +
+        (t.status === 'suspended' ? '<button class="btn xs soft" data-x="resume" data-slug="' + E(t.slug) + '">تشغيل</button>' : '<button class="btn xs danger" data-x="suspend" data-slug="' + E(t.slug) + '">إيقاف</button>') + '<button class="btn xs ghost" data-x="code" data-slug="' + E(t.slug) + '">' + (t.activated ? 'استعادة كلمة المرور' : 'رابط تفعيل') + '</button><a class="btn xs ghost" href="/s/' + E(t.slug) + '" target="_blank">فتح</a></div></td></tr>';
+    }).join('') + '</tbody></table></div>' : '<div class="empty">ما فيه مشتركين لسا. أنشئ أول اشتراك من النموذج.</div>') + '</section>';
+    html += '<div class="stack"><form class="panel stack" id="create"><h2>اشتراك جديد</h2><label class="f">اسم النشاط<input name="name" required maxlength="40" placeholder="مقهى سنا"></label><label class="f">النظام<select name="kind">' + Object.keys(kinds).map(function (k) { return '<option value="' + k + '">' + E(kinds[k]) + '</option>'; }).join('') + '</select></label><label class="f">رابط الصفحة<span class="row" style="gap:6px"><span class="small muted ltr">/s/</span><input name="slug" class="ltr" required pattern="[a-z][a-z0-9\\-]{2,30}" placeholder="sana-cafe"></span></label><div class="grid2"><label class="f">جوال المالك<input name="phone" type="tel" class="ltr" placeholder="05xxxxxxxx"></label><label class="f">المدة<select name="months"><option value="1">شهر</option><option value="3">٣ أشهر</option><option value="6">٦ أشهر</option><option value="12">سنة</option></select></label></div><label class="f">ملاحظة داخلية<input name="note" maxlength="200" placeholder="مثلًا: دفع ٣ أشهر تحويل"></label><p class="err" id="err" hidden></p><button class="btn block">إنشاء وإصدار رابط التفعيل</button></form>' + (S.made ? madeBox(S.made) : '') + '</div></div></div>';
+    return html;
+  }
+  function madeBox(m) {
+    var link = location.origin + '/app?code=' + m.code, msg = 'أهلًا 👋\nحسابك في نظام ' + m.tenant.name + ' من شاهين ديزاين جاهز.\nفعّله واختر كلمة المرور من هنا:\n' + link + '\n\nاسم الحساب: ' + m.tenant.slug + '\nالرابط صالح ١٤ يوم.';
+    return '<div class="panel soft stack" id="made"><h3>رابط التفعيل لـ ' + E(m.tenant.name) + '</h3><p class="ltr small" style="word-break:break-all;background:#fff;padding:8px;border-radius:10px">' + E(link) + '</p><div class="row wrap2"><button class="btn sm" data-x="copy" data-v="' + E(link) + '">نسخ</button>' + (m.phone ? '<a class="btn sm ok" target="_blank" rel="noopener" href="https://wa.me/966' + E(m.phone.slice(1)) + '?text=' + encodeURIComponent(msg) + '">أرسل للعميل بالواتساب</a>' : '') + '</div><p class="tiny muted">الرابط يشتغل مرة وحدة وصالح ١٤ يوم. لا ترسله لغير صاحب النشاط.</p></div>';
+  }
+
+  // ---------- wiring ----------
+  function render() {
+    var app = $('app'), q = new URLSearchParams(location.search), code = q.get('code');
+    if (location.hash === '#admin') { app.innerHTML = vAdmin(); return wireAdmin(); }
+    if (code) { app.innerHTML = vActivate(code); return wireActivate(code); }
+    if (S.me) { app.innerHTML = vDash(); return wireDash(); }
+    app.innerHTML = vLogin(); wireLogin();
+  }
+  function err(m) { var e = $('err'); if (e) { e.hidden = false; e.textContent = m; } else toast(m); }
+  function signedIn(j) {
+    S.sess = { slug: j.tenant.slug, token: j.token }; LS.set('sd-app', S.sess);
+    LS.set('sd:' + j.tenant.slug + ':owner', j.token); // نفس جلسة لوحة الإدارة في صفحة النظام
+    return api('me', { token: j.token }).then(function (m) { S.me = m; history.replaceState(null, '', '/app'); render(); });
+  }
+  function wireActivate(code) {
+    $('act').onsubmit = function (e) { e.preventDefault(); var f = new FormData(e.target); if (f.get('password') !== f.get('password2')) return err('كلمتين المرور مو متطابقة');
+      api('activate', { code: code, password: f.get('password') }).then(function (j) { toast('تم تفعيل حسابك'); return signedIn(j); }, function (x) { err(x.error); }); };
+  }
+  function wireLogin() {
+    $('login').onsubmit = function (e) { e.preventDefault(); var f = new FormData(e.target); api('login', { slug: String(f.get('slug')).trim().toLowerCase(), password: f.get('password') }).then(signedIn, function (x) { err(x.error); }); };
+  }
+  function wireDash() {
+    $('copy').onclick = function () { try { navigator.clipboard.writeText(location.origin + '/s/' + S.me.tenant.slug); toast('انسخ الرابط'); } catch (e) {} };
+    $('out').onclick = function (e) { e.preventDefault(); LS.del('sd-app'); if (S.me) LS.del('sd:' + S.me.tenant.slug + ':owner'); S.me = null; S.sess = null; render(); };
+    $('pw').onsubmit = function (e) { e.preventDefault(); var f = new FormData(e.target); api('password', { token: S.sess.token, old: f.get('old'), password: f.get('password') }).then(function (j) { toast('تغيّرت كلمة المرور'); signedIn(j); }, function (x) { toast(x.error); }); };
+  }
+  function wireAdmin() {
+    if (!S.admin) return;
+    var c = $('create'); if (c) c.onsubmit = function (e) { e.preventDefault(); var f = Object.fromEntries(new FormData(e.target)); f.months = Number(f.months);
+      api('admin', Object.assign({ action: 'create' }, f)).then(function (j) { S.made = { code: j.code, tenant: j.tenant, phone: f.phone ? String(f.phone).replace(/\D/g, '').replace(/^966/, '0') : '' }; return loadAdmin(); }, function (x) { err(x.error); }); };
+    document.querySelectorAll('[data-x]').forEach(function (b) {
+      var x = b.dataset.x, slug = b.dataset.slug;
+      if (x === 'extend') b.onchange = function () { if (!b.value) return; act({ action: 'extend', slug: slug, months: Number(b.value) }, 'تم التمديد'); };
+      else if (x === 'copy') b.onclick = function () { try { navigator.clipboard.writeText(b.dataset.v); toast('انسخ'); } catch (e) {} };
+      else b.onclick = function () {
+        if (x === 'suspend' && !confirm('إيقاف الاشتراك؟ صفحة العميل بتتوقف')) return;
+        api('admin', { action: x, slug: slug }).then(function (j) { if (j.code) { var t = S.admin.tenants.filter(function (y) { return y.slug === slug; })[0] || {}; S.made = { code: j.code, tenant: j.tenant, phone: t.phone || '' }; } toast(x === 'code' ? 'انصدر رابط جديد، الرابط القديم توقف' : 'تم'); loadAdmin(); }, function (e) { toast(e.error); });
+      };
+    });
+    if (S.made) { var m = $('made'); if (m) m.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
+  }
+  function act(body, msg) { api('admin', body).then(function () { toast(msg); loadAdmin(); }, function (e) { toast(e.error); }); }
+  function loadAdmin() { return api('admin', { action: 'list' }).then(function (j) { S.admin = j; render(); }, function () { S.admin = null; render(); }); }
+  window.addEventListener('hashchange', function () { if (location.hash === '#admin') loadAdmin(); else render(); });
+  if (location.hash === '#admin') loadAdmin();
+  else if (S.sess && !new URLSearchParams(location.search).get('code')) api('me', { token: S.sess.token }).then(function (m) { S.me = m; render(); }, function () { LS.del('sd-app'); S.sess = null; render(); });
+  else render();
+})();
+</script>
+</body>
+</html>

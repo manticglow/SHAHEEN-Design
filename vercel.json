@@ -6,6 +6,10 @@
   "cleanUrls": true,
   "rewrites": [
     {
+      "source": "/s/:slug",
+      "destination": "/api/index?__p=s/:slug"
+    },
+    {
       "source": "/",
       "destination": "/api/index?__p="
     },
@@ -90,11 +94,20 @@
           "value": "public, max-age=604800"
         }
       ]
+    },
+    {
+      "source": "/apps/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=300, must-revalidate"
+        }
+      ]
     }
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": "{lib/site.html,404.html,privacy.html,terms.html,carwash.html}"
+      "includeFiles": "{lib/site.html,404.html,privacy.html,terms.html,carwash.html,tenant.html,app.html,demos.html}"
     }
   },
   "crons": [
