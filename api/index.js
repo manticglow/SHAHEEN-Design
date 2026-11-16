@@ -26,7 +26,7 @@ function getEnv() {
 
 async function health() {
   const E = process.env, out = {};
-  const names = Object.keys(E).filter((n) => /SUPABASE|ADMIN_PASSWORD|SESSION_SECRET|OWNER_WA/.test(n) && !/^NEXT_PUBLIC_SUPABASE_ANON|JWT/.test(n));
+  const names = Object.keys(E).filter((n) => /SUPABASE|ADMIN_PASSWORD|SESSION_SECRET|OWNER_WA|WA_TOKEN|APP_SECRET|PHONE_NUMBER_ID|VERIFY_TOKEN|^MODE$|^ADMINS$/.test(n) && !/^NEXT_PUBLIC_SUPABASE_ANON|JWT/.test(n));
   out.found = names.sort(); // الأسماء بس، بدون القيم
   const pw = String(E.ADMIN_PASSWORD || '');
   out.admin_password = pw ? `موجود — عدد حروفه ${pw.trim().length}${pw !== pw.trim() ? ' (فيه مسافة زايدة، تجاهلناها)' : ''}${/[\u0600-\u06FF]/.test(pw) ? ' (فيه حروف عربية)' : ''}` : 'ناقص';
@@ -37,6 +37,19 @@ async function health() {
     try { await env.BOT_KV.get('health:ping'); out.database = 'متصل ✓'; }
     catch (err) { out.database = 'فشل الاتصال: ' + String(err.message).slice(0, 300); }
   } catch (err) { out.supabase_env = String(err.message); }
+  // واتساب: نتأكد إن التوكن ومعرف الرقم شغالين (بدون ما نكشف التوكن)
+  const miss = ['WA_TOKEN', 'APP_SECRET', 'PHONE_NUMBER_ID', 'VERIFY_TOKEN'].filter((k) => !String(E[k] || '').trim());
+  if (miss.length === 4) out.whatsapp = 'ما انضاف';
+  else if (miss.length) out.whatsapp = 'ناقص: ' + miss.join('، ');
+  else {
+    out.whatsapp_mode = E.MODE === 'separate' ? 'separate (رقم مستقل)' : 'coexistence (نفس رقمك)';
+    try {
+      const base = (E.GRAPH_BASE || 'https://graph.facebook.com').replace(/\/$/, '');
+      const r = await fetch(`${base}/${E.GRAPH_VERSION || 'v26.0'}/${String(E.PHONE_NUMBER_ID).trim()}?fields=display_phone_number,verified_name,quality_rating`, { headers: { authorization: 'Bearer ' + String(E.WA_TOKEN).trim() } });
+      const j = await r.json().catch(() => ({}));
+      out.whatsapp = r.ok ? `متصل ✓ ${j.display_phone_number || ''} ${j.verified_name ? '(' + j.verified_name + ')' : ''}`.trim() : 'خطأ من Meta: ' + String((j.error && j.error.message) || r.status).slice(0, 200);
+    } catch (err) { out.whatsapp = 'فشل الاتصال بـ Meta: ' + String(err.message).slice(0, 120); }
+  }
   return new Response(JSON.stringify(out, null, 2), { headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
 }
 
