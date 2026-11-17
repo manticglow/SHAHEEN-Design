@@ -86,4 +86,18 @@ assert.equal((await env.BOT_KV.get('lead:' + nl.id, 'json')).value, undefined);
 r = await call('/api/owner/lead', { method: 'POST', body: { id: nl.id, value: 7000 }, cookie: owner }); assert.equal(r.j.lead.value, 7000);
 r = await call('/api/owner/summary', { cookie: st3 }); assert.equal(r.j.leads.find((l) => l.id === nl.id).value, undefined);
 ok('الطلبات: إضافة يدوية وإحالة، إسناد، موعد متابعة، سجل كامل، والقيمة للمالك بس');
+// المشاريع ونسبة الشريك
+r = await call('/api/owner/project', { method: 'POST', body: { title: 'متجر عبايات', client: 'منيرة', partner: lamaId, pct: 15, value: 23000, costs: 4000, taxes: 3000, roles: ['استقطاب'], referred: true }, cookie: st3 }); assert.equal(r.s, 403);
+r = await call('/api/owner/project', { method: 'POST', body: { title: 'متجر عبايات', client: 'منيرة', partner: lamaId, pct: 15, value: 23000, costs: 4000, taxes: 3000, roles: ['استقطاب', 'مزيف'], referred: true }, cookie: owner }); assert.equal(r.s, 200);
+const pr = r.j.project; assert.deepEqual(pr.roles, ['استقطاب']); assert.equal(pr.calc.expected, 2400);
+await call('/api/owner/project', { method: 'POST', body: { title: 'موقع شركة', client: 'شركة ب', pct: 0, value: 9000 }, cookie: owner });
+r = await call('/api/owner/project/money', { method: 'POST', body: { id: pr.id, kind: 'collect', amount: 23000 }, cookie: owner }); assert.equal(r.j.project.calc.due, 2400);
+r = await call('/api/owner/project/money', { method: 'POST', body: { id: pr.id, kind: 'payout', amount: 1000 }, cookie: owner }); assert.equal(r.j.project.calc.remaining, 1400);
+r = await call('/api/owner/projects', { cookie: st3 }); assert.equal(r.j.projects.length, 1); assert.equal(r.j.projects[0].calc.remaining, 1400);
+r = await call('/api/owner/project/money', { method: 'POST', body: { id: pr.id, kind: 'payout', amount: 1400 }, cookie: st3 }); assert.equal(r.s, 403);
+r = await call('/api/owner/project/note', { method: 'POST', body: { id: pr.id, text: 'سلّمت الشعار للعميلة' }, cookie: st3 }); assert.equal(r.s, 200); assert.equal(r.j.project.log.at(-1).by, 'لمى');
+r = await call('/api/owner/projects', { cookie: owner }); assert.equal(r.j.projects.length, 2);
+const other = r.j.projects.find((x) => x.title === 'موقع شركة');
+r = await call('/api/owner/project/note', { method: 'POST', body: { id: other.id, text: 'x' }, cookie: st3 }); assert.equal(r.s, 403);
+ok('المشاريع: الموظف يشوف مشاريعه بس ونسبته من الصافي، والإضافة والصرف للمالك');
 console.log(`\nstaff: ${n} passed`);
