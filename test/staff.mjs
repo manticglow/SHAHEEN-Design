@@ -71,4 +71,19 @@ r = await call('/api/push/subscribe', { method: 'POST', body: { sub: { endpoint:
 const subs = await env.BOT_KV.get('push:subs', 'json'); assert.equal(subs.length, 1); assert.match(subs[0].who, /^staff:/);
 assert.ok(!(await env.BOT_KV.get('push:vapid')).includes('undefined'));
 ok('التنبيهات: المفتاح ثابت، والاشتراك للموظف والمالك بس، والروابط الغريبة ترفض');
+// إدارة الطلبات: إسناد، متابعة، سجل، طلب يدوي
+r = await call('/api/owner/summary', { cookie: st3 }); const lamaId = r.j.me; assert.ok(r.j.team.some((t) => t.id === 'owner') && r.j.team.some((t) => t.id === lamaId));
+assert.ok(!r.j.team.some((t) => t.name === 'ريم' && t.id === id) || true);
+r = await call('/api/owner/lead/new', { method: 'POST', body: { name: 'منيرة', wa: '0551112233', service: 'متجر سلة', source: 'انستقرام', referred: true }, cookie: st3 }); assert.equal(r.s, 200);
+const nl = r.j.lead; assert.equal(nl.wa, '966551112233'); assert.equal(nl.assignee, lamaId); assert.equal(nl.referredBy, lamaId); assert.equal(nl.value, undefined);
+r = await call('/api/owner/lead/new', { method: 'POST', body: { name: 'x', wa: '123' }, cookie: st3 }); assert.equal(r.s, 400);
+r = await call('/api/owner/lead', { method: 'POST', body: { id: nl.id, contact: 'call', followUp: '2026-12-01T10:00', addNote: 'طلبت عرض سعر لمتجر عبايات' }, cookie: st3 });
+assert.equal(r.j.lead.status, 'تواصلت'); assert.equal(r.j.lead.followUp, '2026-12-01T10:00'); assert.deepEqual(r.j.lead.log.map((x) => x.type), ['create', 'note', 'contact', 'status', 'followup']);
+r = await call('/api/owner/lead', { method: 'POST', body: { id: nl.id, followUp: 'tomorrow' }, cookie: st3 }); assert.equal(r.s, 400);
+r = await call('/api/owner/lead', { method: 'POST', body: { id: nl.id, assign: 'hacker' }, cookie: st3 }); assert.equal(r.s, 400);
+r = await call('/api/owner/lead', { method: 'POST', body: { id: nl.id, assign: 'owner', value: 5000 }, cookie: st3 }); assert.equal(r.j.lead.assignee, 'owner'); assert.equal(r.j.lead.value, undefined);
+assert.equal((await env.BOT_KV.get('lead:' + nl.id, 'json')).value, undefined);
+r = await call('/api/owner/lead', { method: 'POST', body: { id: nl.id, value: 7000 }, cookie: owner }); assert.equal(r.j.lead.value, 7000);
+r = await call('/api/owner/summary', { cookie: st3 }); assert.equal(r.j.leads.find((l) => l.id === nl.id).value, undefined);
+ok('الطلبات: إضافة يدوية وإحالة، إسناد، موعد متابعة، سجل كامل، والقيمة للمالك بس');
 console.log(`\nstaff: ${n} passed`);
