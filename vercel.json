@@ -107,7 +107,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": "{lib/site.html,404.html,privacy.html,terms.html,carwash.html,tenant.html,app.html,demos.html}"
+      "includeFiles": "{lib/site.html,404.html,privacy.html,terms.html,carwash.html,tenant.html,app.html,demos.html,invitations.html}"
     }
   },
   "crons": [
