@@ -4,7 +4,7 @@
   "type": "module",
   "engines": { "node": ">=20" },
   "scripts": {
-    "test": "node test/sim.mjs && node test/cms.mjs && node test/supabase.mjs && node test/booking.mjs && node test/store.mjs && node test/messages.mjs && node test/carwash.mjs && node test/saas.mjs"
+    "test": "node test/sim.mjs && node test/cms.mjs && node test/supabase.mjs && node test/booking.mjs && node test/store.mjs && node test/messages.mjs && node test/carwash.mjs && node test/saas.mjs && node test/staff.mjs"
   },
   "dependencies": {
     "@vercel/functions": "^3.0.0"
