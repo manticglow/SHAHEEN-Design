@@ -62,4 +62,13 @@ r = await call('/api/staff', { method: 'POST', body: { action: 'add', name: 'ل�
 r = await call('/api/login', { method: 'POST', body: { user: 'lama.test@gmail.com', password: 'Lama-2026-pass' } }); assert.equal(r.s, 200);
 r = await call('/api/staff', { method: 'POST', body: { action: 'add', name: 'x', user: 'bad@@mail', password: 'Lama-2026-pass' }, cookie: owner }); assert.equal(r.s, 400);
 ok('اسم المستخدم ينفع يكون إيميل');
+r = await call('/api/push/key'); assert.equal(r.s, 401);
+const st3 = (await call('/api/login', { method: 'POST', body: { user: 'lama.test@gmail.com', password: 'Lama-2026-pass' } })).c;
+r = await call('/api/push/key', { cookie: st3 }); assert.equal(r.s, 200); assert.ok(r.j.key.length > 60);
+const k1 = r.j.key; r = await call('/api/push/key', { cookie: owner }); assert.equal(r.j.key, k1);
+r = await call('/api/push/subscribe', { method: 'POST', body: { sub: { endpoint: 'javascript:x', keys: { p256dh: 'a', auth: 'b' } } }, cookie: st3 }); assert.equal(r.s, 400);
+r = await call('/api/push/subscribe', { method: 'POST', body: { sub: { endpoint: 'https://fcm.googleapis.com/fcm/send/abc123', keys: { p256dh: 'BKey', auth: 'Auth' } } }, cookie: st3 }); assert.equal(r.s, 200);
+const subs = await env.BOT_KV.get('push:subs', 'json'); assert.equal(subs.length, 1); assert.match(subs[0].who, /^staff:/);
+assert.ok(!(await env.BOT_KV.get('push:vapid')).includes('undefined'));
+ok('التنبيهات: المفتاح ثابت، والاشتراك للموظف والمالك بس، والروابط الغريبة ترفض');
 console.log(`\nstaff: ${n} passed`);
