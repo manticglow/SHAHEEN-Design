@@ -100,4 +100,14 @@ r = await call('/api/owner/projects', { cookie: owner }); assert.equal(r.j.proje
 const other = r.j.projects.find((x) => x.title === 'موقع شركة');
 r = await call('/api/owner/project/note', { method: 'POST', body: { id: other.id, text: 'x' }, cookie: st3 }); assert.equal(r.s, 403);
 ok('المشاريع: الموظف يشوف مشاريعه بس ونسبته من الصافي، والإضافة والصرف للمالك');
+// تطبيق الفريق وتغيير كلمة المرور
+const html = async (cookie, q = '') => { const r = await worker.fetch(new Request('https://shaheen.test/admin' + q, { headers: cookie ? { cookie } : {} }), env, {}); return r.text(); };
+assert.match(await html(st3), /فريق شاهين/); assert.match(await html(owner), /لوحة تحكم/); assert.match(await html(owner, '?view=team'), /فريق شاهين/); assert.doesNotMatch(await html(''), /فريق شاهين/);
+r = await call('/api/me/password', { method: 'POST', body: { old: 'wrong-one', password: 'Lama-New-2026' }, cookie: st3 }); assert.equal(r.s, 403);
+r = await call('/api/me/password', { method: 'POST', body: { old: 'Lama-2026-pass', password: 'short' }, cookie: st3 }); assert.equal(r.s, 400);
+r = await call('/api/me/password', { method: 'POST', body: { old: 'Lama-2026-pass', password: 'Lama-New-2026' }, cookie: st3 }); assert.equal(r.s, 200); const st4 = r.c;
+r = await call('/api/owner/summary', { cookie: st3 }); assert.equal(r.s, 401);
+r = await call('/api/owner/summary', { cookie: st4 }); assert.equal(r.s, 200);
+r = await call('/api/me/password', { method: 'POST', body: { old: 'x', password: 'Whatever-2026' }, cookie: owner }); assert.equal(r.s, 401);
+ok('الموظف ياخذ تطبيق الفريق، ويغيّر كلمة مروره، والجلسة القديمة تنتهي');
 console.log(`\nstaff: ${n} passed`);
