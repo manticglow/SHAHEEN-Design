@@ -107,6 +107,31 @@ s = await T('demo-bio', { op: 'link', data: { title: 'xss', url: 'javascript:ale
 s = await T('demo-bio', { op: 'state' }); assert.ok(s.j.links.every((l) => l.url === undefined)); assert.equal(s.j.inbox, undefined);
 ok('صفحة الروابط ترفض javascript: وما تكشف الروابط ولا الطلبات للزوار');
 
+// دعوات المناسبات: رابط شخصي، تأكيد حضور، باركود دخول، ومنع الدخول المكرر
+s = await T('demo-invite', { op: 'ownerPin', pin: '9999' }); const io = s.j.token;
+s = await T('demo-invite', { op: 'event', data: { type: 'زواج', title: 'حفل زواج', host1: 'فيصل', host2: 'ريم', date: new Date(now + 5 * 86400e3).toISOString().slice(0, 10), time: '21:00', theme: 'night' }, auth: { owner: io } }); assert.equal(s.s, 200); assert.equal(s.j.event.hosts, 'فيصل وريم');
+s = await T('demo-invite', { op: 'state' }); assert.equal(s.j.guests, undefined); assert.equal(s.j.guest, undefined); assert.deepEqual(s.j.demoGuest, ['gDEMO', 'DEMOGUEST2026']); assert.ok(!JSON.stringify(s.j).includes('05'));
+s = await T('demo-invite', { op: 'state', data: { guest: ['gDEMO', 'DEMOGUEST2026'] } }); assert.equal(s.j.guest.name, 'ضيف التجربة'); assert.equal(s.j.guest.qr, 'SDI:gDEMO.DEMOGUEST2026'); assert.equal(s.j.guest.phone, undefined);
+s = await T('demo-invite', { op: 'rsvp', data: { guest: ['g1', 'WRONGKEY99'], answer: 'yes' } }); assert.equal(s.s, 403);
+s = await T('demo-invite', { op: 'rsvp', data: { guest: ['gDEMO', 'DEMOGUEST2026'], answer: 'yes', coming: 9 } }); assert.equal(s.j.guest.rsvp, 'yes'); assert.equal(s.j.guest.coming, 3);
+s = await T('demo-invite', { op: 'guest', data: { name: 'x y' } }); assert.equal(s.s, 401);
+s = await T('demo-invite', { op: 'staffPin', pin: '1234' }); const ist = s.j.token;
+assert.ok(s.j.guests.every((g) => g.key === undefined && !/^05\d{8}$/.test(g.phone || '')));
+s = await T('demo-invite', { op: 'guest', data: { name: 'x y' }, auth: { staff: ist } }); assert.equal(s.s, 401);
+s = await T('demo-invite', { op: 'checkin', data: { code: 'SDI:gDEMO.DEMOGUEST2026' }, auth: { staff: ist } }); assert.equal(s.j.scan.result, 'ok'); assert.equal(s.j.scan.n, 3);
+s = await T('demo-invite', { op: 'checkin', data: { code: 'SDI:gDEMO.DEMOGUEST2026' }, auth: { staff: ist } }); assert.equal(s.j.scan.result, 'dup');
+s = await T('demo-invite', { op: 'checkin', data: { code: 'SDI:gDEMO.NOTTHEKEY1' }, auth: { staff: ist } }); assert.equal(s.j.scan.result, 'bad');
+s = await T('demo-invite', { op: 'checkin', data: { code: 'SDI:gDEMO.DEMOGUEST2026' } }); assert.equal(s.s, 401);
+s = await T('demo-invite', { op: 'rsvp', data: { guest: ['gDEMO', 'DEMOGUEST2026'], answer: 'no' } }); assert.equal(s.s, 409);
+ok('الدعوات: الرابط الشخصي بمفتاحه، الحضور ما يتعدى المقاعد، والباب يمنع الدخول المكرر والباركود المزور');
+s = await T('demo-invite', { op: 'bulk', data: { text: 'نوف التجربة، ٠٥٣٩٩٩٨٨٧٧، ٢\nأم خالد,0569876543,4\nx', group: 'الجيران' }, auth: { owner: io } }); assert.deepEqual(s.j.bulk, { added: 2, skipped: 1 });
+const nora = s.j.guests.find((g) => g.name === 'نوف التجربة'); assert.equal(nora.phone, '0539998877'); assert.equal(nora.seats, 2); assert.ok(s.j.groups.includes('الجيران'));
+s = await T('demo-invite', { op: 'relink', data: { id: nora.id }, auth: { owner: io } }); const nk = s.j.guests.find((g) => g.id === nora.id).key; assert.notEqual(nk, nora.key);
+s = await T('demo-invite', { op: 'state', data: { guest: [nora.id, nora.key] } }); assert.equal(s.j.guest, undefined);
+s = await T('demo-invite', { op: 'state', data: { guest: [nora.id, nk] } }); assert.equal(s.j.guest.name, 'نوف التجربة');
+s = await T('demo-invite', { op: 'event', data: { date: '2026-01-01', time: '21:00', mapUrl: 'javascript:alert(1)' }, auth: { owner: io } }); assert.equal(s.s, 400);
+ok('الدعوات: إضافة قائمة بالأرقام العربية، والرابط الجديد يوقف القديم');
+
 // --- الإيقاف وانتهاء الاشتراك
 r = await P('admin', { action: 'suspend', slug: 'reem-cafe' }, admin); s = await T('reem-cafe', { op: 'state', auth: { owner: own1 } }); assert.equal(s.s, 402);
 r = await P('admin', { action: 'resume', slug: 'reem-cafe' }, admin); s = await T('reem-cafe', { op: 'state' }); assert.equal(s.s, 200);
