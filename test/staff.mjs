@@ -58,4 +58,8 @@ for (let i = 0; i < 10; i++) await call('/api/login', { method: 'POST', body: { 
 r = await call('/api/login', { method: 'POST', body: { user: 'reem', password: 'New-Reem-2026' }, ip: '6.6.6.6' }); assert.equal(r.s, 429);
 ok('تخمين كلمة المرور يقفل الحساب مؤقتًا حتى من أجهزة مختلفة');
 r = await call('/api/me', { cookie: owner }); assert.equal(r.j.role, 'owner');
+r = await call('/api/staff', { method: 'POST', body: { action: 'add', name: 'لمى', user: 'Lama.Test@Gmail.com', password: 'Lama-2026-pass' }, cookie: owner }); assert.equal(r.s, 200);
+r = await call('/api/login', { method: 'POST', body: { user: 'lama.test@gmail.com', password: 'Lama-2026-pass' } }); assert.equal(r.s, 200);
+r = await call('/api/staff', { method: 'POST', body: { action: 'add', name: 'x', user: 'bad@@mail', password: 'Lama-2026-pass' }, cookie: owner }); assert.equal(r.s, 400);
+ok('اسم المستخدم ينفع يكون إيميل');
 console.log(`\nstaff: ${n} passed`);
