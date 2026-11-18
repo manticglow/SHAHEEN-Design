@@ -134,6 +134,41 @@ for (let i = 0; i < 60; i++) await T('demo-cafe', { op: 'lookup', phone: '050000
 s = await T('demo-cafe', { op: 'staffPin', pin: '1234' }); assert.equal(s.s, 200);
 ok('محاولات غلط على بطاقات العملاء ما تقفل دخول موظفين المحل');
 
+// سرقة الحساب: مهاجم يبدأ اشتراك برقم الضحية ويدفع بعد ما الضحية يسجّل
+env = mkEnv(true); ({ P, T } = mk(env));
+r = await P('checkout', { kind: 'bio', period: 'm', name: 'مهاجم', slug: 'evil-page', phone: '0507777777', password: 'Attacker2026' }); const coA = r.j.co.id, gA = r.j.given_id, ckA = r.c;
+r = await P('checkout', { kind: 'cafe', period: 'm', name: 'الضحية', slug: 'victim-cafe', phone: '0507777777', password: 'Victim20266' }); const coV = r.j.co.id, gV = r.j.given_id, ckV = r.c;
+pays.set(gV, { id: gV, status: 'paid', amount: 14900, currency: 'SAR', metadata: { co: coV, kind: 'sub' }, source: { type: 'creditcard' } });
+r = await P('pay/confirm', { co: coV }, { cookie: ckV }); assert.equal(r.j.status, 'paid'); assert.equal(r.j.loggedIn, true);
+pays.set(gA, { id: gA, status: 'paid', amount: 3900, currency: 'SAR', metadata: { co: coA, kind: 'sub' }, source: { type: 'creditcard' } });
+r = await P('pay/confirm', { co: coA }, { cookie: ckA }); assert.equal(r.j.status, 'conflict'); assert.equal(r.j.loggedIn, undefined); assert.equal(r.c, '');
+const acct = await env.BOT_KV.get('sd:acct:0507777777', 'json'); assert.deepEqual(acct.slugs, ['victim-cafe']); assert.equal(await env.BOT_KV.get('sd:tenant:evil-page'), null);
+r = await P('login', { id: '0507777777', password: 'Attacker2026' }); assert.equal(r.s, 403);
+ok('ما ينسرق الحساب: اشتراك ثاني بنفس الرقم ما ينربط بالحساب ولا يدخل صاحبه، والدفعة تتعلّم للاسترجاع');
+
+// صفحة طويلة الرابط ومأخوذ: الرقم الإضافي ما ينقص
+const long = 'a' + 'b'.repeat(30); await env.BOT_KV.put('sd:tenant:' + long, JSON.stringify({ slug: long, kind: 'bio', coId: 'other' }));
+const coL = { id: 'L'.repeat(24), kind: 'bio', period: 'm', months: 1, total: 3900, vat: 0, lines: [], attempts: ['gL'], signup: { name: 'طويل', slug: long, phone: '0508888888', pw: { salt: 'x', hash: 'y' } } };
+await env.BOT_KV.put('sd:co:' + coL.id, JSON.stringify(coL));
+r = await applyPaid(env, coL, { id: 'gL', status: 'paid', amount: 3900, currency: 'SAR', metadata: { co: coL.id } }, now); assert.equal(r.ok, true); assert.equal(r.co.slugFinal, long.slice(0, 29) + '-2');
+ok('رابط بطول ٣١ ومأخوذ ياخذ رقم في آخره بدل ما يعلق الدفع');
+
+// إيقاف وتشغيل مشترك برقم جوال، واستعادة كلمة المرور برابط من الإدارة
+const ad2 = { cookie: 'sd_admin=' + await makeSession(env, now) };
+await P('admin', { action: 'suspend', slug: 'victim-cafe' }, ad2); await P('admin', { action: 'resume', slug: 'victim-cafe' }, ad2);
+assert.equal((await env.BOT_KV.get('sd:tenant:victim-cafe', 'json')).status, 'active');
+r = await P('admin', { action: 'code', slug: 'victim-cafe' }, ad2); r = await P('activate', { code: r.j.code, password: 'NewVictim2026' }); assert.equal(r.s, 200);
+r = await P('me', {}, { cookie: r.c }); assert.equal(r.s, 200); assert.equal(r.j.tenant.slug, 'victim-cafe');
+r = await P('login', { id: '+966 50 777 7777', password: 'NewVictim2026' }); assert.equal(r.s, 200);
+r = await P('login', { id: '0507777777', password: 'Victim20266' }); assert.equal(r.s, 403);
+ok('الإيقاف والتشغيل ما يخرب حساب الجوال، ورابط الاستعادة يغيّر كلمة مرور الحساب نفسه');
+
+// بدون مفاتيح: ما نمدد مشترك حقيقي بدفع تجريبي
+const kvReal = env.BOT_KV; env = mkEnv(false); env.BOT_KV = kvReal; ({ P, T } = mk(env));
+r = await P('login', { id: '0507777777', password: 'NewVictim2026' });
+r = await P('checkout', { renew: 'victim-cafe', period: 'y' }, { cookie: r.c }); assert.equal(r.s, 400);
+ok('الدفع التجريبي ما يمدد اشتراك حقيقي ولا يطلع فاتورة حقيقية');
+
 // applyPaid يرفض دفعة مو من محاولات هذا الطلب
 r = await applyPaid(env, { id: 'X', total: 100, attempts: ['a'] }, { id: 'b', status: 'paid', amount: 100, currency: 'SAR', metadata: { co: 'X' } }, now); assert.equal(r.ok, false);
 r = await subWebhook(env, { data: { id: 'zz', metadata: { co: 'NOPE' } } }, now); assert.equal(r.skip, true);

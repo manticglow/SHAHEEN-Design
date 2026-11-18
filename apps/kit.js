@@ -175,7 +175,7 @@
     var a = e.target.closest('[data-a]'); if (!a || a.tagName === 'FORM') return;
     var n = a.dataset.a;
     if (n === 'pinkey') { var k = a.dataset.k, p = K.ui.pin || ''; if (k === 'del') p = p.slice(0, -1); else if (k === 'ok') { if (p.length >= 4) { K.ui.pin = p; return pinSubmit(); } } else if (p.length < 6) p += k; K.ui.pin = p; render(true); if (p.length === 4 && K.st.tenant.demo) pinSubmit(); return; }
-    if (n === 'logout') { e.preventDefault(); if (K.role === 'owner' && !K.st.tenant.demo) fetch('/api/platform/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).catch(function () {}); K.setTok(K.role === 'owner' ? 'owner' : 'staff', null); if (K.role !== 'owner' && K.role !== 'staff') { K.setTok('owner', null); K.setTok('staff', null); } K.refresh(); return; }
+    if (n === 'logout') { e.preventDefault(); var out = K.role === 'owner' && !K.st.tenant.demo ? fetch('/api/platform/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).catch(function () {}) : Promise.resolve(); K.setTok(K.role === 'owner' ? 'owner' : 'staff', null); if (K.role !== 'owner' && K.role !== 'staff') { K.setTok('owner', null); K.setTok('staff', null); } out.then(function () { K.refresh(); K.toast('طلعت من حسابك'); }); return; }
     if (n === 'close') { K.close(); return; }
     var fn = K.def && K.def.actions[n]; if (fn) { e.preventDefault(); fn(a, e); }
   });
