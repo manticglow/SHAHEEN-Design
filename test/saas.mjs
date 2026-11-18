@@ -10,7 +10,7 @@ let now = Date.UTC(2026, 10, 17, 9, 0), ipn = 0, n = 0;
 const ok = (t) => { n++; console.log('✓ ' + t); };
 const req = (path, body, h = {}) => new Request('https://x' + path, { method: 'POST', headers: { 'content-type': 'application/json', 'x-forwarded-for': '10.0.' + (Math.floor(ipn / 200) % 200) + '.' + (ipn++ % 200), ...h }, body: JSON.stringify(body) });
 const T = async (slug, body, h) => { const p = '/api/t/' + slug + '/op'; const r = await handleTenant(req(p, body, h), env, new URL('https://x' + p), now); return { s: r.status, j: await r.json() }; };
-const P = async (path, body, h) => { const p = '/api/platform/' + path; const r = await handlePlatform(req(p, body, h), env, new URL('https://x' + p), now); return { s: r.status, j: await r.json() }; };
+const P = async (path, body, h) => { const p = '/api/platform/' + path; const r = await handlePlatform(req(p, body, { origin: 'https://x', ...h }), env, new URL('https://x' + p), now); const sc = r.headers.get('set-cookie') || ''; return { s: r.status, j: await r.json(), c: sc.split(';')[0] }; };
 const admin = { cookie: 'sd_admin=' + await makeSession(env, now) };
 
 // --- كل التجارب تشتغل
@@ -36,17 +36,25 @@ ok('قبل التفعيل: صفحة العملاء مقفلة وما فيه دخ
 // --- التفعيل
 r = await P('activate', { code: 'A'.repeat(20), password: 'StrongPass1' }); assert.equal(r.s, 403);
 r = await P('activate', { code: code1, password: 'short' }); assert.equal(r.s, 400);
-r = await P('activate', { code: code1, password: 'ReemCafe2026' }); assert.equal(r.s, 200); let own1 = r.j.token;
+r = await P('activate', { code: code1, password: 'ReemCafe2026' }); assert.equal(r.s, 200); let ck1 = r.c; assert.ok(ck1.startsWith('sd_own=')); assert.equal(r.j.token, undefined);
 r = await P('activate', { code: code1, password: 'Hijack2026!' }); assert.equal(r.s, 403);
 ok('رابط التفعيل يشتغل مرة وحدة، ويرفض كلمة مرور ضعيفة ورموز مزيفة');
-r = await P('activate', { code: code2, password: 'NoorClinic99' }); const own2 = r.j.token;
+r = await P('activate', { code: code2, password: 'NoorClinic99' }); const own2 = (await T('noor-clinic', { op: 'ownerLogin', password: 'NoorClinic99' })).j.token; assert.ok(own2);
 
 // --- الدخول ولوحة المالك
 r = await P('login', { slug: 'reem-cafe', password: 'wrong-pass' }); assert.equal(r.s, 403);
-r = await P('login', { slug: 'reem-cafe', password: 'ReemCafe2026' }); assert.equal(r.s, 200);
-r = await P('me', { token: own1 }); assert.equal(r.s, 200); assert.equal(r.j.tenant.slug, 'reem-cafe'); assert.ok(!JSON.stringify(r.j).includes('0551234567'));
-ok('الدخول بكلمة المرور، ولوحة المشترك تخفي رقمه');
-let s = await T('reem-cafe', { op: 'state', auth: { owner: own1 } }); assert.equal(s.s, 200); assert.equal(s.j.me.owner, true);
+r = await P('login', { slug: 'reem-cafe', password: 'ReemCafe2026' }, { origin: '' }); assert.equal(r.s, 403);
+r = await P('login', { slug: 'reem-cafe', password: 'ReemCafe2026' }); assert.equal(r.s, 200); assert.ok(r.c.startsWith('sd_own=')); ck1 = r.c;
+r = await P('me', {}, { cookie: ck1 }); assert.equal(r.s, 200); assert.equal(r.j.tenant.slug, 'reem-cafe'); assert.equal(r.j.tenant.phase, 'active');
+r = await P('me', {}, { cookie: ck1, origin: 'https://evil.example' }); assert.equal(r.s, 403);
+r = await P('me', {}); assert.equal(r.s, 401);
+ok('الدخول بكوكي محمي (HttpOnly) ومن نفس الموقع بس، والحساب القديم يدخل باسم الحساب');
+let s = await T('reem-cafe', { op: 'ownerLogin', password: 'ReemCafe2026' }); let own1 = s.j.token;
+s = await T('reem-cafe', { op: 'state', auth: { owner: own1 } }); assert.equal(s.s, 200); assert.equal(s.j.me.owner, true); assert.equal(s.j.billing.phase, 'active');
+s = await T('reem-cafe', { op: 'state', auth: { owner: 'cookie' } }, { cookie: ck1, origin: 'https://x' }); assert.equal(s.j.me.owner, true);
+s = await T('reem-cafe', { op: 'state', auth: { owner: 'cookie' } }, { cookie: ck1 }); assert.equal(s.j.me.owner, false);
+s = await T('noor-clinic', { op: 'state', auth: { owner: 'cookie' } }, { cookie: ck1, origin: 'https://x' }); assert.equal(s.j.me.owner, false);
+ok('صفحة النظام تقبل كوكي المالك بس لما تطلبه صراحة ومن نفس الموقع، وما يفتح مشترك ثاني');
 s = await T('noor-clinic', { op: 'state', auth: { owner: own1 } }); assert.equal(s.j.me.owner, false);
 s = await T('noor-clinic', { op: 'doctor', data: { name: 'د. اختراق', open: '08:00', close: '12:00', dur: 20 }, auth: { owner: own1 } }); assert.equal(s.s, 401);
 ok('توكن مشترك ما يفتح لوحة مشترك ثاني');
@@ -55,9 +63,10 @@ s = await T('reem-cafe', { op: 'ownerLogin', password: 'ReemCafe2026' }); assert
 ok('رمز التجربة ٩٩٩٩ ما يشتغل على حساب حقيقي');
 
 // --- تغيير كلمة المرور يطلّع الجلسات القديمة
-r = await P('password', { token: own1, old: 'ReemCafe2026', password: 'NewReem2026' }); assert.equal(r.s, 200);
+r = await P('password', { old: 'ReemCafe2026', password: 'NewReem2026' }, { cookie: ck1 }); assert.equal(r.s, 200);
 s = await T('reem-cafe', { op: 'state', auth: { owner: own1 } }); assert.equal(s.j.me.owner, false);
-own1 = r.j.token; s = await T('reem-cafe', { op: 'state', auth: { owner: own1 } }); assert.equal(s.j.me.owner, true);
+assert.equal((await P('me', {}, { cookie: ck1 })).s, 401); ck1 = r.c; assert.equal((await P('me', {}, { cookie: ck1 })).s, 200);
+s = await T('reem-cafe', { op: 'ownerLogin', password: 'NewReem2026' }); own1 = s.j.token; s = await T('reem-cafe', { op: 'state', auth: { owner: own1 } }); assert.equal(s.j.me.owner, true);
 ok('تغيير كلمة المرور يلغي الجلسات القديمة');
 
 // --- الموظفين
