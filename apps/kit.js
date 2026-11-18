@@ -12,6 +12,7 @@
   var K = window.K = { slug: slug, st: null, role: null, ui: {}, def: null, LS: LS, key: key,
     tok: { owner: LS.get(key('owner'), null), staff: LS.get(key('staff'), null), cust: LS.get(key('cust'), []) },
     mine: LS.get(key('mine'), []) };
+  K.role = (location.hash || '').slice(1) || null; // يعرف من البداية إذا الصفحة مفتوحة للإدارة (عشان يرسل كوكي الحساب)
   var MAP = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
   K.esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return MAP[c]; }); };
   K.$ = function (id) { return document.getElementById(id); };
@@ -25,7 +26,7 @@
   K.initial = function (s) { return K.esc(String(s || '؟').trim().replace(/^(د\.|م\.|أ\.)\s*/, '').charAt(0)); };
 
   // ---------- server ----------
-  K.auth = function () { return { owner: K.tok.owner, staff: K.tok.staff, cust: K.tok.cust.map(function (c) { return c.token; }) }; };
+  K.auth = function () { return { owner: K.tok.owner || (K.role === 'owner' ? 'cookie' : null), staff: K.tok.staff, cust: K.tok.cust.map(function (c) { return c.token; }) }; };
   K.addMine = function (id, k) { K.mine = [[id, k]].concat(K.mine.filter(function (x) { return x[0] !== id; })).slice(0, 25); LS.set(key('mine'), K.mine); };
   K.addCust = function (id, token) { K.tok.cust = [{ id: id, token: token }].concat(K.tok.cust.filter(function (c) { return c.id !== id; })).slice(0, 5); LS.set(key('cust'), K.tok.cust); };
   K.setTok = function (role, t) { K.tok[role] = t; if (t) LS.set(key(role), t); else LS.del(key(role)); };
@@ -54,18 +55,18 @@
     if (!had && j.tenant && !K.def) loadKind(j.tenant.kind);
   }
   function lum(h) { var n = parseInt(h.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255; }
-  function loadKind(kind) { var s = document.createElement('script'); s.src = '/apps/' + kind + '.js?v=1'; s.onerror = function () { K.toast('ما قدرنا نحمّل الصفحة'); }; document.body.appendChild(s); }
+  function loadKind(kind) { var s = document.createElement('script'); s.src = '/apps/' + kind + '.js?v=2'; s.onerror = function () { K.toast('ما قدرنا نحمّل الصفحة'); }; document.body.appendChild(s); }
   K.refresh = function () { return K.api('state').then(function () { render(); }, function () {}); };
   K.run = function (op, data, okMsg) { // تنفيذ عملية + رسالة + إعادة رسم
     return K.api(op, data).then(function (j) { if (okMsg) K.toast(okMsg); render(true); return j; }, function (e) { K.toast(e.error || 'صار خطأ'); render(true); throw e; });
   };
 
   // ---------- render ----------
-  K.define = function (def) { K.def = def; var roles = def.roles.map(function (r) { return r[0]; }); var h = (location.hash || '').slice(1); K.role = roles.indexOf(h) >= 0 ? h : roles[0]; if (def.init) def.init(); render(true); };
+  K.define = function (def) { K.def = def; var roles = def.roles.map(function (r) { return r[0]; }); var h = (location.hash || '').slice(1); K.role = roles.indexOf(h) >= 0 ? h : roles[0]; if (def.init) def.init(); render(true); if (K.role === 'owner' && K.st && !K.st.me.owner && !K.tok.owner) K.refresh(); };
   function busy() { if (document.querySelector('.sheet-bg')) return true; var a = document.activeElement; return a && /INPUT|TEXTAREA|SELECT/.test(a.tagName) && a.closest('#app'); }
   function render(force) {
     var app = K.$('app'); if (!app) return;
-    if (K.blocked) { app.innerHTML = '<div class="col" style="margin-top:12vh;text-align:center"><div class="panel"><h2>' + K.esc(K.blocked.error || 'الخدمة متوقفة مؤقتًا') + '</h2><p class="muted" style="margin-top:8px">' + K.esc((K.blocked.tenant || {}).name || '') + '</p></div><p class="foot">بواسطة <a href="/">شاهين ديزاين</a></p></div>'; return; }
+    if (K.blocked) { var bk = K.blocked; app.innerHTML = '<div class="col" style="margin-top:12vh;text-align:center"><div class="panel stack" style="align-items:center"><div class="av" style="width:56px;height:56px;border-radius:16px">' + K.ic(bk.owner ? 'crown' : 'clock', 26) + '</div><h2>' + K.esc(bk.error || 'الصفحة متوقفة مؤقتًا') + '</h2><p class="muted">' + K.esc(bk.note || (bk.tenant || {}).name || '') + '</p>' + (bk.owner ? '<a class="btn" style="width:100%" href="' + K.esc(bk.renew || '/app#billing') + '">' + K.ic('card', 18) + 'جدّد الاشتراك</a>' : '') + '</div><p class="foot">' + (bk.owner || K.role !== 'owner' ? '' : '') + 'بواسطة <a href="/">شاهين ديزاين</a></p></div>'; return; }
     if (!K.st || !K.def) return;
     if (!force && busy()) return;
     var y = window.scrollY, st = K.st, b = st.brand || {}, demo = st.tenant.demo, d = K.def;
@@ -73,7 +74,10 @@
     var top = '<header class="top"><div class="brand"><div class="logo" aria-hidden="true">' + (d.logo ? d.logo() : K.initial(b.name)) + '</div><div style="min-width:0"><b>' + K.esc(b.name) + '</b><small>' + K.esc(b.tagline || '') + '</small></div></div>' +
       (showRoles ? '<nav class="roles" role="tablist">' + d.roles.map(function (r) { return '<button role="tab" type="button" data-role="' + r[0] + '" aria-selected="' + (K.role === r[0]) + '">' + K.esc(r[1]) + '</button>'; }).join('') + '</nav>' : '') + '</header>';
     if (d.bare && d.bare(K.role)) top = showRoles ? '<header class="top" style="justify-content:center"><nav class="roles" role="tablist">' + d.roles.map(function (r) { return '<button role="tab" type="button" data-role="' + r[0] + '" aria-selected="' + (K.role === r[0]) + '">' + K.esc(r[1]) + '</button>'; }).join('') + '</nav></header>' : '';
-    var bar = demo ? '<div class="demo-bar"><span class="live"><i></i>تجربة حية ترجع لبدايتها كل يوم</span><span>رمز الموظف <b class="ltr">1234</b> · المدير <b class="ltr">9999</b></span><a href="/demos">كل الأنظمة ←</a></div>' : '';
+    var bar = demo ? '<div class="demo-bar"><span class="live"><i></i>تجربة حية ترجع لبدايتها كل يوم</span><span>رمز الموظف <b class="ltr">1234</b> · المدير <b class="ltr">9999</b></span><span class="row" style="gap:12px"><a href="/demos">كل الأنظمة</a><a class="btn xs" style="min-height:34px;color:var(--accent-ink);text-decoration:none" href="' + (st.tenant.kind === 'invite' ? 'https://wa.me/966582409776?text=' + encodeURIComponent('أبي دعوات إلكترونية لمناسبتي') : '/app#start/' + st.tenant.kind) + '">' + (st.tenant.kind === 'invite' ? 'اطلب دعوتك' : 'اشترك بهذا النظام') + '</a></span></div>' : '';
+    // تنبيه الاشتراك للمالك: قرب ينتهي أو في فترة السماح
+    var bl = st.billing, left = bl ? Math.ceil((Date.parse(bl.until) - Date.now()) / 864e5) : 99;
+    if (bl && K.role === 'owner' && st.me.owner && (bl.phase === 'grace' || left <= 7)) bar += '<div class="panel ' + (bl.phase === 'grace' ? '' : 'soft') + ' row between wrap2" style="margin-bottom:12px;' + (bl.phase === 'grace' ? 'background:var(--danger-bg);border-color:transparent' : '') + '"><span class="row" style="gap:8px">' + K.ic(bl.phase === 'grace' ? 'alert' : 'clock', 20) + '<b class="small">' + (bl.phase === 'grace' ? 'انتهى اشتراكك، ونظامك شغّال لعملائك لين ' + K.dayName(new Date(Date.parse(bl.graceEnd) + 3 * 36e5).toISOString().slice(0, 10)) + '. جدّد عشان ما يوقف' : (left > 1 ? 'اشتراكك ينتهي بعد ' + left + ' أيام' : left === 1 ? 'اشتراكك ينتهي بكرة' : 'اشتراكك ينتهي اليوم')) + '</b></span><a class="btn sm" href="/app#billing">جدّد</a></div>';
     var body;
     if ((K.role === 'staff' || K.role === 'owner') && !(K.role === 'staff' ? st.me.staff || (d.ownerCanStaff && st.me.owner) : st.me.owner)) body = gate(K.role);
     else body = d.views[K.role]();
@@ -86,10 +90,10 @@
 
   function gate(role) {
     var demo = K.st.tenant.demo, title = role === 'staff' ? (K.def.staffTitle || 'دخول الموظف') : 'دخول الإدارة';
-    if (role === 'owner' && !demo) return '<div class="col"><form class="panel stack" data-a="ownerLogin"><h2>' + title + '</h2><p class="muted small">ادخل بكلمة مرور حسابك</p><label class="f">كلمة المرور<input name="password" type="password" autocomplete="current-password" required minlength="8"></label><button class="btn">دخول</button><p class="small muted">نسيت كلمة المرور؟ تواصل مع شاهين ديزاين لرابط تفعيل جديد</p></form></div>';
+    if (role === 'owner' && !demo) return '<div class="col"><form class="panel stack" data-a="ownerLogin"><h2>' + title + '</h2><p class="muted small">ادخل بكلمة مرور حسابك</p><label class="f">كلمة المرور<input name="password" type="password" autocomplete="current-password" required minlength="8"></label><button class="btn">دخول</button><p class="small muted">عندك حساب في شاهين؟ <a href="/app">ادخل برقم جوالك</a> وترجع هنا على طول · <a href="/app#forgot">نسيت كلمة المرور؟</a></p></form></div>';
     var p = K.ui.pin || '';
     return '<div class="col"><div class="panel pin" id="pinp"><h2>' + title + '</h2><p class="muted small">' + (demo ? 'رمز التجربة <b class="ltr">' + (role === 'staff' ? '1234' : '9999') + '</b>' : 'اكتب رمزك من ٤ إلى ٦ أرقام') + '</p><div class="dots">' + [0, 1, 2, 3].map(function (i) { return '<i class="' + (i < p.length ? 'on' : '') + '"></i>'; }).join('') + '</div><div class="keys">' +
-      ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].map(function (k) { return '<button type="button" data-a="pinkey" data-k="' + k + '" aria-label="' + (k === 'del' ? 'مسح' : k === 'ok' ? 'دخول' : k) + '">' + (k === 'del' ? '⌫' : k === 'ok' ? '✓' : k) + '</button>'; }).join('') + '</div></div></div>';
+      ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'].map(function (k) { return '<button type="button" data-a="pinkey" data-k="' + k + '" aria-label="' + (k === 'del' ? 'مسح' : k === 'ok' ? 'دخول' : k) + '">' + (k === 'del' ? K.ic('back', 24) : k === 'ok' ? K.ic('check', 24) : k) + '</button>'; }).join('') + '</div></div></div>';
   }
   function pinSubmit() {
     var role = K.role, pin = K.ui.pin; K.ui.pin = '';
@@ -125,6 +129,7 @@
     tea: '<path d="M5 10h11v4a5 5 0 0 1-5 5h-1a5 5 0 0 1-5-5z"/><path d="M16 11h2a2 2 0 0 1 0 4h-2"/><path d="M9 7c0-1 1-1 1-2M12 7c0-1 1-1 1-2"/>',
     cake: '<path d="M4 20h16v-7H4z"/><path d="M4 15c2 1 4 1 6 0s4-1 6 0 3 1 4 0"/><path d="M12 13V9"/><path d="M12 6.5a1 1 0 0 1 0-2 1 1 0 0 1 0 2z"/>',
     cookie: '<circle cx="12" cy="12" r="8"/><circle cx="9" cy="10" r=".8"/><circle cx="14" cy="9" r=".8"/><circle cx="13" cy="14" r=".8"/><circle cx="9.5" cy="15" r=".8"/>',
+    back: '<path d="M9 6h11v12H9l-6-6z"/><path d="M12.5 9.5l5 5M17.5 9.5l-5 5"/>', crown: '<path d="M4 17l-1-9 5 4 4-7 4 7 5-4-1 9z"/><path d="M4 20h16"/>', alert: '<path d="M12 4l9 16H3z"/><path d="M12 10v4M12 17v.01"/>',
     plus: '<path d="M12 5v14M5 12h14"/>', minus: '<path d="M5 12h14"/>', check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>',
     clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', gift: '<rect x="4" y="9" width="16" height="11" rx="1.5"/><path d="M3 9h18M12 9v11M12 9c-2-4-6-4-6-1.5S9 9 12 9zM12 9c2-4 6-4 6-1.5S15 9 12 9z"/>',
     star: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/>', bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/>',
@@ -166,11 +171,11 @@
   // ---------- events ----------
   document.addEventListener('click', function (e) {
     var r = e.target.closest('[data-role]');
-    if (r) { e.preventDefault(); K.role = r.dataset.role; K.ui.pin = ''; history.replaceState(null, '', '#' + K.role); K.close(); render(true); window.scrollTo(0, 0); return; }
+    if (r) { e.preventDefault(); K.role = r.dataset.role; K.ui.pin = ''; history.replaceState(null, '', '#' + K.role); K.close(); render(true); window.scrollTo(0, 0); if (K.role === 'owner' && !K.st.me.owner && !K.st.tenant.demo) K.refresh(); return; }
     var a = e.target.closest('[data-a]'); if (!a || a.tagName === 'FORM') return;
     var n = a.dataset.a;
     if (n === 'pinkey') { var k = a.dataset.k, p = K.ui.pin || ''; if (k === 'del') p = p.slice(0, -1); else if (k === 'ok') { if (p.length >= 4) { K.ui.pin = p; return pinSubmit(); } } else if (p.length < 6) p += k; K.ui.pin = p; render(true); if (p.length === 4 && K.st.tenant.demo) pinSubmit(); return; }
-    if (n === 'logout') { e.preventDefault(); K.setTok(K.role === 'owner' ? 'owner' : 'staff', null); if (K.role !== 'owner' && K.role !== 'staff') { K.setTok('owner', null); K.setTok('staff', null); } K.refresh(); return; }
+    if (n === 'logout') { e.preventDefault(); if (K.role === 'owner' && !K.st.tenant.demo) fetch('/api/platform/logout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }).catch(function () {}); K.setTok(K.role === 'owner' ? 'owner' : 'staff', null); if (K.role !== 'owner' && K.role !== 'staff') { K.setTok('owner', null); K.setTok('staff', null); } K.refresh(); return; }
     if (n === 'close') { K.close(); return; }
     var fn = K.def && K.def.actions[n]; if (fn) { e.preventDefault(); fn(a, e); }
   });

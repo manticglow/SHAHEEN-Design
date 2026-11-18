@@ -5,6 +5,9 @@
   --ok:#1B7F4B; --ok-bg:#E3F3EA; --warn:#8A5A00; --warn-bg:#FFF2D6; --danger:#B3261E; --danger-bg:#FCE9E7; --info:#1F5F99; --info-bg:#E5F0FA;
   --display:'Readex Pro','IBM Plex Sans Arabic',system-ui,sans-serif; --body:'IBM Plex Sans Arabic',system-ui,-apple-system,'Segoe UI',Tahoma,sans-serif;
   --r:18px; --shadow:0 1px 2px rgba(28,26,24,.04),0 8px 24px -12px rgba(28,26,24,.12); color-scheme:light;
+  --house-ink:#1D1D1F; --gold:#B8935A; --gold-2:#8C6A36; --gold-l:#EAD7B2;
+  --r-xs:9px; --r-sm:12px; --r-md:14px; --r-lg:24px; --r-pill:999px; --sh-2:0 30px 60px -20px rgba(0,0,0,.30);
+  --e-out:cubic-bezier(.2,.8,.2,1); --t-press:120ms; --t-fade:200ms; --t-sheet:280ms; --t-pop:350ms; --t-draw:450ms;
 }
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.6;min-height:100vh}
@@ -92,5 +95,17 @@ table.t{width:100%;border-collapse:collapse;font-size:13.5px}table.t th{text-ali
 @media(max-width:700px){.split{grid-template-columns:1fr}}
 @media(max-width:900px){.dash{grid-template-columns:1fr}.kanban{grid-template-columns:1fr}}
 @media(max-width:420px){.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}h1{font-size:22px}}
-@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+/* الحركة الخفيفة: تختصر الحركة وتوصل لشكلها النهائي (مو تتجمد في أولها) */
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;animation-delay:0s!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
+/* الدفع والنجاح: نفس الدائرة تتحول من انتظار ← صح ← إيصال */
+.fx .ring path{stroke-dasharray:24;stroke-dashoffset:24;animation:draw var(--t-draw) var(--e-out) .15s forwards}
+.fx .ring{animation:ringIn var(--t-pop) var(--e-out) both}
+.ring.wait{background:conic-gradient(var(--accent) 0 25%,var(--accent-mid) 0)!important;animation:spin 1s linear infinite!important}.ring.wait svg{display:none}
+.ring.bad{background:var(--danger)!important;color:#fff!important}
+@keyframes ringIn{from{transform:scale(.6);opacity:0}}@keyframes draw{to{stroke-dashoffset:0}}@keyframes spin{to{transform:rotate(1turn)}}
+.btn[aria-busy=true]{pointer-events:none;color:transparent!important;position:relative}
+.btn[aria-busy=true]::after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;border:2px solid var(--accent-ink);border-top-color:transparent;animation:spin .8s linear infinite}
+.btn.ghost[aria-busy=true]::after,.btn.soft[aria-busy=true]::after{border-color:var(--accent);border-top-color:transparent}
+/* iPhone: أقل من ١٦px يكبّر الصفحة عند الكتابة */
+@media(max-width:700px){input:not([type=checkbox]):not([type=radio]):not([type=color]),textarea,select{font-size:16px}}
 @media print{body{background:#fff}.top,.demo-bar,.foot,.tabs,.btn,.roles{display:none!important}.panel{box-shadow:none;border:0}}
