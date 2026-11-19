@@ -90,6 +90,7 @@
       '<label class="f">كلمة المرور<div class="field"><input name="password" type="password" required autocomplete="current-password"><button type="button" class="eye" data-x="eye" aria-label="إظهار كلمة المرور">' + ic('eye', 20) + '</button></div></label>' +
       '<p class="err" id="err" role="alert" hidden></p><button class="btn" id="loginBtn">دخول</button>' +
       '<div class="row between small"><a href="#" data-x="bySlug">' + (bySlug ? 'ادخل برقم جوالك' : 'أو ادخل باسم الحساب') + '</a><a href="#forgot">نسيت كلمة المرور؟</a></div></form>' +
+      '<button type="button" class="btn ghost" data-x="walStart" id="walBtn" hidden>' + ic('phone', 18) + 'ادخل بالواتساب بدون كلمة مرور</button>' +
       '<a class="panel item" href="#start" style="text-decoration:none;color:inherit"><div class="av">' + ic('spark') + '</div><div class="grow"><b>ما عندك حساب؟</b><div class="small muted">اختر نظامك واشترك، وحسابك يجهز في نفس اللحظة</div></div>' + ic('arrow', 18) + '</a>' +
       '<p class="foot"><a href="/demos">جرّب الأنظمة حيّة</a></p></div>';
   }
@@ -293,6 +294,7 @@
   }
   function wire() {
     var f;
+    if ($('walBtn')) loadPlans().then(function (j) { var b = $('walBtn'); if (b && j && j.wal) b.hidden = false; }, function () {});
     if ((f = $('login'))) f.onsubmit = function (e) { var f = e.currentTarget;
       e.preventDefault(); var d = Object.fromEntries(new FormData(f)), btn = f.querySelector('button:not([type=button])'); busy(btn, true);
       api('login', { id: String(d.id).trim(), password: d.password }).then(function () { return loadMe(); }).then(function () { busy(btn, false); var n = S.next || ''; S.next = ''; if (new URLSearchParams(location.search).get('paid')) { location.href = '/s/' + S.me.tenant.slug + '#owner'; return; } after('/app' + n); }, function (x) { busy(btn, false); err(x.error || 'ما قدرنا ندخلك'); });
@@ -323,6 +325,39 @@
       app.insertBefore(bn, app.children[1] || null);
     }
   }
+  // الدخول بالواتساب: نعطيه رمز، يرسله للبوت من جواله ويأكد، والصفحة تنتظر وتدخله تلقائيًا
+  var WL = null;
+  function walStop() { if (WL) { clearTimeout(WL.t); WL = null; } }
+  function walMsg(m, bad) { var e = $('walSt'); if (e) { e.textContent = m; e.className = 'small ' + (bad ? 'err' : 'muted'); } }
+  function walStart(btn) {
+    busy(btn, true);
+    api('wa-start').then(function (j) {
+      busy(btn, false); walStop();
+      var phone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+      sheet('<div class="stack" style="text-align:center"><h2>ادخل بالواتساب</h2>' +
+        '<p class="small muted">' + (phone ? 'اضغط الزر، وأرسل الرسالة الجاهزة لبوت شاهين ديزاين من رقم حسابك، وبعدها اضغط "تأكيد الدخول".' : 'صوّر الرمز بكاميرا جوالك (الجوال اللي عليه رقم حسابك)، وأرسل الرسالة الجاهزة، وبعدها اضغط "تأكيد الدخول".') + '</p>' +
+        (phone ? '' : '<div><div class="qrbox">' + qr(j.link) + '</div></div>') +
+        '<p class="ltr" style="font-size:22px;letter-spacing:.2em;font-weight:700">دخول ' + E(j.code) + '</p>' +
+        '<a class="btn" href="' + E(j.link) + '" target="_blank" rel="noopener">' + ic('phone', 18) + 'افتح الواتساب</a>' +
+        '<p id="walSt" class="small muted" role="status">ننتظر رسالتك…</p>' +
+        '<button type="button" class="btn ghost" data-x="walClose">إلغاء</button></div>');
+      WL = { code: j.code, end: Date.now() + (j.ttl || 300) * 1000, t: 0 };
+      var tick = function () {
+        if (!WL) return;
+        if (Date.now() > WL.end) { walMsg('انتهى الرمز. سكّر واضغط "ادخل بالواتساب" من جديد.', true); walStop(); return; }
+        api('wa-poll', { code: WL.code }).then(function (r) {
+          if (!WL) return;
+          if (r.st === 'ok') { walStop(); closeSheet(); return loadMe().then(function () { var n = S.next || ''; S.next = ''; after('/app' + n); }); }
+          if (r.st === 'ask') walMsg('وصلت رسالتك ✅ اضغط "تأكيد الدخول" في الواتساب.');
+          if (r.st === 'none') { walMsg('ما لقينا حساب بهالرقم. أرسلها من واتساب الرقم المسجّل بحسابك، أو ادخل بكلمة المرور.', true); walStop(); return; }
+          if (r.st === 'no') { walMsg('انلغى طلب الدخول من الواتساب.', true); walStop(); return; }
+          if (r.st === 'expired') { walMsg('انتهى الرمز. سكّر واضغط "ادخل بالواتساب" من جديد.', true); walStop(); return; }
+          WL.t = setTimeout(tick, 2000);
+        }, function () { if (WL) WL.t = setTimeout(tick, 4000); });
+      };
+      WL.t = setTimeout(tick, 2000);
+    }, function (x) { busy(btn, false); err(x.error || 'ما قدرنا نبدأ الدخول بالواتساب'); });
+  }
   function adminAct(body, msg) { api('admin', body).then(function () { toast(msg); loadAdmin(); }, function (e) { toast(e.error); }); }
   function loadAdmin() { return api('admin', { action: 'list' }).then(function (j) { S.admin = j; render(); }, function () { S.admin = null; render(); }); }
 
@@ -332,6 +367,8 @@
     if (x === 'eye') { var inp = a.parentNode.querySelector('input'); var show = inp.type === 'password'; inp.type = show ? 'text' : 'password'; a.innerHTML = ic(show ? 'eyeoff' : 'eye', 20); a.setAttribute('aria-label', show ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'); return; }
     e.preventDefault();
     if (x === 'bySlug') { S.bySlug = !S.bySlug; render(); }
+    else if (x === 'walStart') walStart(a);
+    else if (x === 'walClose') { walStop(); closeSheet(); }
     else if (x === 'period') { S.ck.period = a.dataset.v; render(); }
     else if (x === 'kind') { S.ck.kind = a.dataset.v; history.replaceState(null, '', '#start/' + a.dataset.v); render(); }
     else if (x === 'next') { if (S.ck.kind) { S.ck.step = 2; render(); window.scrollTo(0, 0); } }
