@@ -30,7 +30,7 @@ async function health(request) {
   const E = process.env;
   let admin = false; try { admin = await isAdmin(request, E); } catch {}
   if (!admin) {
-    const out = { ok: true, admin_password: E.ADMIN_PASSWORD ? 'موجود' : 'ناقص', session_secret: E.SESSION_SECRET ? 'موجود' : 'ناقص', note: 'سجّل دخول في /admin عشان تشوف التفاصيل' };
+    const out = { ok: true };
     try { const e = getEnv(); await e.BOT_KV.get('health:ping'); out.database = 'متصل ✓'; } catch { out.database = 'غير متصل'; }
     return new Response(JSON.stringify(out, null, 2), { headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
   }

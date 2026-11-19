@@ -1,0 +1,8 @@
+srv-demo.log
+*.log
+test/
+tools/
+supabase/
+README.md
+GOOGLE-BUSINESS.md
+.env.example
