@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import worker from '../lib/app.js';
 import { handlePlatform } from '../lib/saas/platform.js';
 import { ownSession } from '../lib/saas/billing.js';
+import { isAdmin, staffSession, makeSession } from '../lib/cms.js';
 
 const SECRET = 'test-app-secret';
 let clock = Date.UTC(2026, 10, 20, 17, 0), n = 0, ipn = 0, seq = 0;
@@ -121,5 +122,60 @@ ok('كلمة "دخول" لحالها تروح للبوت العادي، والم
 let lim = 0; for (let i = 0; i < 12; i++) { const x = await P('wa-start', {}, { 'x-forwarded-for': '9.9.9.9' }); if (x.s === 429) lim++; }
 assert.ok(lim >= 2);
 ok('طلب رموز كثيرة من نفس الجهاز يتوقف بعد ١٠ محاولات');
+
+// ================= لوحة التحكم: المالك والموظفين =================
+const A = async (path, method = 'POST', body, h = {}) => {
+  const orig = Date.now; Date.now = () => clock;
+  try {
+    const r = await worker.fetch(new Request('https://x' + path, { method, headers: { 'content-type': 'application/json', origin: 'https://x', 'x-forwarded-for': '10.2.0.' + (ipn++ % 250), ...h }, body: body === undefined ? undefined : JSON.stringify(body) }), env, null);
+    const cookies = r.headers.getSetCookie ? r.headers.getSetCookie() : [];
+    return { s: r.status, j: await r.json(), cookies, c: (name) => (cookies.find((x) => x.startsWith(name + '=')) || '').split(';')[0] };
+  } finally { Date.now = orig; }
+};
+const adminCk = 'sd_admin=' + await makeSession(env, clock);
+assert.equal((await A('/api/wa-ready', 'GET')).j.on, true);
+let s1 = await A('/api/staff', 'POST', { action: 'add', name: 'لمار', user: 'lamar', password: 'LamarPass1', phone: '+966 53 333 3333' }, { cookie: adminCk });
+assert.equal(s1.s, 200); const lamar = s1.j.find((a) => a.user === 'lamar'); assert.equal(lamar.phone, '0533333333');
+assert.equal((await A('/api/staff', 'POST', { action: 'add', name: 'سارة', user: 'sara', password: 'SaraPass11', phone: '0533333333' }, { cookie: adminCk })).s, 400);
+assert.equal((await A('/api/staff', 'POST', { action: 'add', name: 'سارة', user: 'sara', password: 'SaraPass11', phone: '0582409776' }, { cookie: adminCk })).s, 400);
+assert.equal((await A('/api/staff', 'POST', { action: 'add', name: 'سارة', user: 'sara', password: 'SaraPass11', phone: '12345' }, { cookie: adminCk })).s, 400);
+assert.equal((await A('/api/staff', 'POST', { action: 'add', name: 'سارة', user: 'sara', password: 'SaraPass11' }, { cookie: adminCk })).s, 200);
+ok('الموظف له رقم واتساب اختياري، وما يتكرر ولا ياخذ رقم المالك');
+
+// المالك
+let a = await A('/api/wa-start'); assert.equal(a.s, 200); let ac = a.j.code, aw = a.c('sd_wala');
+assert.ok(a.cookies[0].includes('Path=/api;') && a.cookies[0].includes('SameSite=Strict'));
+out = await wa('966582409776', text('دخول ' + ac)); assert.match(said(out), /لوحة تحكم/);
+await wa('966582409776', btn('wal:ok:' + ac));
+a = await A('/api/wa-poll', 'POST', { code: ac }, { cookie: aw }); assert.equal(a.j.st, 'ok'); assert.equal(a.j.role, 'owner');
+assert.equal(await isAdmin(new Request('https://x', { headers: { cookie: a.c('sd_admin') } }), env, clock), true);
+ok('المالك يدخل اللوحة بالواتساب من رقمه (OWNER_WA) بجلسة المالك');
+
+// الموظف
+a = await A('/api/wa-start'); ac = a.j.code; aw = a.c('sd_wala');
+await wa('966533333333', text('دخول ' + ac)); await wa('966533333333', btn('wal:ok:' + ac));
+a = await A('/api/wa-poll', 'POST', { code: ac }, { cookie: aw }); assert.equal(a.j.role, 'staff');
+assert.equal(a.c('sd_admin'), '');
+const st = await staffSession(new Request('https://x', { headers: { cookie: a.c('sd_staff') } }), env, clock); assert.equal(st.user, 'lamar');
+assert.equal(await isAdmin(new Request('https://x', { headers: { cookie: a.c('sd_staff') } }), env, clock), false);
+ok('الموظف يدخل بجلسة موظف بس، ما ياخذ صلاحيات المالك');
+
+// موظف موقوف، ورقم صاحب حساب /app ما يفتح اللوحة
+await A('/api/staff', 'POST', { action: 'disable', id: lamar.id }, { cookie: adminCk });
+a = await A('/api/wa-start'); ac = a.j.code; aw = a.c('sd_wala');
+out = await wa('966533333333', text('دخول ' + ac)); assert.match(said(out), /ما لقينا حساب/);
+a = await A('/api/wa-start'); ac = a.j.code; aw = a.c('sd_wala');
+out = await wa(OWNER_WA, text('دخول ' + ac)); assert.match(said(out), /ما لقينا حساب/);
+ok('الموظف الموقوف ما يدخل، وصاحب اشتراك ما يقدر يفتح لوحة التحكم');
+
+// رمز /app ما يفتح اللوحة، ورمز اللوحة ما يفتح /app
+r = await P('wa-start'); c2 = r.j.code; w2 = r.c('sd_wal');
+await wa('966582409776', text('دخول ' + c2)); // رقم المالك ما عنده حساب /app
+assert.equal((await A('/api/wa-poll', 'POST', { code: c2 }, { cookie: 'sd_wala=' + w2.slice(7) })).j.st, 'expired');
+a = await A('/api/wa-start'); ac = a.j.code; aw = a.c('sd_wala');
+await wa('966582409776', text('دخول ' + ac)); await wa('966582409776', btn('wal:ok:' + ac));
+assert.equal((await P('wa-poll', { code: ac }, { cookie: 'sd_wal=' + aw.slice(8) })).j.st, 'expired');
+assert.equal((await A('/api/wa-poll', 'POST', { code: ac }, { cookie: aw })).j.st, 'ok');
+ok('رمز دخول اللوحة ورمز حسابات المشتركين منفصلين، ما ينفع واحد مكان الثاني');
 
 console.log(`\nwalogin: ${n} passed`);
