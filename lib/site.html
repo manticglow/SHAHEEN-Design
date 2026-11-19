@@ -1452,9 +1452,10 @@ html.ld-skip #ld{display:none}
   try{ seen=sessionStorage.getItem('sd-ld')==='1'; }catch(e){}
   if(seen){ d.classList.add('ld-skip'); return; }
   function done(){ var el=document.getElementById('ld'); if(!el||el.classList.contains('out')) return;
-    setTimeout(function(){ el.classList.add('out'); try{ sessionStorage.setItem('sd-ld','1'); }catch(e){} setTimeout(function(){ el.remove(); },1100); },Math.max(0,1450-(Date.now()-t0))); }
-  if(document.readyState==='complete') done(); else window.addEventListener('load',done);
-  setTimeout(done,3500);
+    setTimeout(function(){ el.classList.add('out'); try{ sessionStorage.setItem('sd-ld','1'); }catch(e){} setTimeout(function(){ el.remove(); },1100); },Math.max(0,1300-(Date.now()-t0))); }
+  // ما ننتظر تحميل كل الصور: أول ما تجهز الصفحة تبدأ الحركة، عشان المحتوى يظهر أسرع
+  if(document.readyState!=='loading') done(); else document.addEventListener('DOMContentLoaded',done);
+  setTimeout(done,2500);
 })();
 </script>
 <a class="skip" href="#all">انتقل للمنتجات</a>
