@@ -1441,6 +1441,15 @@ html.ld-skip #ld{display:none}
   sdHit(location.pathname,first);
 })();
 </script>
+<script>
+// Meta Pixel: لقياس الإعلانات بس، على الدومين الحقيقي. نسجّل زيارة الصفحة، وضغطة الواتساب (Contact)، وإرسال طلب السلة (Lead)
+(function(){ if(!window.SD_PATHS) return;
+  !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+  fbq('init','1693857319024460'); fbq('track','PageView');
+  window.sdTrack=function(ev,p){ try{ fbq('track',ev,p||{}); }catch(e){} };
+  document.addEventListener('click',function(e){ var a=e.target&&e.target.closest&&e.target.closest('a[href*="wa.me"]'); if(a) sdTrack('Contact'); },true);
+})();
+</script>
 <div id="ld" aria-hidden="true"><div class="in">
   <div class="f"><svg class="base"><use href="#falcon" fill="currentColor"/></svg><svg class="gold"><use href="#falcon" fill="currentColor"/></svg><svg class="fill"><use href="#falcon" fill="currentColor"/></svg></div>
   <div class="w"><span style="animation-delay:0.35s">S</span><span style="animation-delay:0.41s">H</span><span style="animation-delay:0.47s">A</span><span style="animation-delay:0.53s">H</span><span style="animation-delay:0.59s">E</span><span style="animation-delay:0.65s">E</span><span style="animation-delay:0.71s">N</span></div>
@@ -2198,6 +2207,7 @@ function orderId(){ var d=new Date(), p=function(n){ return String(n).padStart(2
 $('sendOrder').addEventListener('click',function(){ if(!form.name.trim()){ var i=$('cName'); $('cNameErr').hidden=false; i.setAttribute('aria-invalid','true'); i.focus(); return; }
   var id=orderId(), L=['طلب جديد من الموقع','رقم الطلب: '+id,'الاسم: '+form.name.trim()]; if(form.org.trim()) L.push('الجهة: '+form.org.trim()); L.push('القسم: متجر الموقع');
   L.push('الخدمات: '+bag.map(function(k){ var it=itemOf(k); return it.mock?it.name+' ('+it.sub.split(' · ')[0]+')':it.name; }).join('، ')); if(form.tl) L.push('الموعد: '+form.tl); L.push('الميزانية: تبدأ من '+fmt(total())+' ر.س'); if(form.note.trim()) L.push('التفاصيل: '+form.note.trim().replace(/\s*\n+\s*/g,' / '));
+  if(window.sdTrack) sdTrack('Lead',{value:total(),currency:'SAR'});
   var url=wa(L.join('\n')); window.open(url,'_blank','noopener'); sent={id:id,url:url}; bag=[]; save(); setDot(); syncAll(); renderBag(); });
 
 // ── overlays ──
