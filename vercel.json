@@ -40,6 +40,10 @@
     {
       "source": "/:page([a-z][a-z0-9-]{1,40})",
       "destination": "/api/index?__p=:page"
+    },
+    {
+      "source": "/:path*",
+      "destination": "/api/index?__p=:path*"
     }
   ],
   "headers": [
