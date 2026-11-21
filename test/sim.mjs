@@ -195,6 +195,17 @@ await test('alert via template when admin window is closed', async () => {
   const t = out.find((b) => b.type === 'template'); assert.ok(t); assert.equal(t.template.name, 'new_lead_alert'); assert.equal(t.template.components[0].parameters.length, 4);
 });
 
+await test('welcome menu lists ready-made systems and they can be picked', async () => {
+  const ctx = makeEnv(); const c = '966510000099';
+  const w = await say(ctx, c, text('هلا'));
+  const rows = w[0].interactive.action.sections.flatMap((s) => s.rows.map((r) => r.id));
+  assert.equal(rows[0], 'cat_ready');
+  const svc = await say(ctx, c, list('cat_ready'));
+  const ids = svc[0].interactive.action.sections[0].rows.map((r) => r.id);
+  for (const id of ['svc_wallet', 'svc_salon', 'svc_menu', 'svc_invite']) assert.ok(ids.includes(id), id);
+  assert.ok(ids.length <= 10);
+});
+
 await test('separate-number mode gives the client a link to the owner', async () => {
   const ctx = makeEnv({ MODE: 'separate' }); const c = '966510000000';
   await say(ctx, c, text('هلا')); await say(ctx, c, list('human'));
