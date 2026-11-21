@@ -55,7 +55,7 @@ res = await page('/salla'); h = await res.text(); assert.match(h, /<title>ثيم
 assert.equal((h.match(/property="og:title"/g) || []).length, 1, 'no duplicate og tags');
 res = await page('/book'); h = await res.text(); assert.match(h, /احجز استشارة/);
 res = await page('/nope'); assert.equal(res.status, 404);
-res = await page('/sitemap.xml'); h = await res.text(); assert.match(h, /<loc>https:\/\/shaheen.test\/wallet<\/loc>/); assert.equal((h.match(/<url>/g) || []).length, 18); assert.match(h, /\/salon<\/loc>/); assert.match(h, /\/demos<\/loc>/); assert.match(h, /\/invitations<\/loc>/);
+res = await page('/sitemap.xml'); h = await res.text(); assert.match(h, /<loc>https:\/\/shaheen.test\/wallet<\/loc>/); assert.equal((h.match(/<url>/g) || []).length, 23); assert.match(h, /\/complaints<\/loc>/); assert.match(h, /\/salon<\/loc>/); assert.match(h, /\/demos<\/loc>/); assert.match(h, /\/invitations<\/loc>/);
 res = await page('/robots.txt'); h = await res.text(); assert.match(h, /Sitemap: https:\/\/shaheen.test\/sitemap.xml/);
 assert.equal(await page('/admin'), null); assert.equal(await page('/api/slots'), null);
 console.log('booking + seo: all tests passed');

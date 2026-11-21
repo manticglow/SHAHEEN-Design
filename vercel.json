@@ -133,7 +133,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": "{lib/site.html,404.html,privacy.html,terms.html,carwash.html,tenant.html,app.html,demos.html,invitations.html}"
+      "includeFiles": "{lib/site.html,404.html,privacy.html,terms.html,refund.html,delivery.html,complaints.html,carwash.html,tenant.html,app.html,demos.html,invitations.html}"
     }
   },
   "crons": [

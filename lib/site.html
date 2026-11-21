@@ -1441,13 +1441,33 @@ html.ld-skip #ld{display:none}
   sdHit(location.pathname,first);
 })();
 </script>
+<div class="ck" id="ck" role="dialog" aria-labelledby="ckH" aria-describedby="ckP" hidden>
+  <div class="ck-in"><div><b id="ckH">ملفات تعريف الارتباط</b><p id="ckP">نستخدم كوكيز ضرورية لتشغيل الموقع. وبموافقتك نستخدم كوكيز Meta لقياس إعلاناتنا. <a href="/privacy#cookies">التفاصيل</a></p></div>
+  <div class="ck-b"><button type="button" class="btn ink sm" data-ck="all">موافق</button><button type="button" class="btn line sm" data-ck="necessary">الضرورية فقط</button></div></div>
+</div>
+<style>.ck{position:fixed;inset-inline:16px;bottom:16px;z-index:90;display:flex;justify-content:center;pointer-events:none}.ck[hidden]{display:none}
+.ck-in{pointer-events:auto;max-width:720px;width:100%;background:#fff;color:var(--ink);border:1px solid var(--line2);border-radius:20px;box-shadow:0 24px 60px -20px rgba(0,0,0,.28);padding:18px 20px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.ck-in b{font-size:16px}.ck-in p{margin:4px 0 0;font-size:14px;color:var(--sub);line-height:1.7}.ck-in a{color:inherit;text-decoration:underline}.ck-b{display:flex;gap:8px;flex-shrink:0}
+@media (max-width:560px){.ck-b{width:100%}.ck-b .btn{flex:1}}</style>
 <script>
-// Meta Pixel: لقياس الإعلانات بس، على الدومين الحقيقي. نسجّل زيارة الصفحة، وضغطة الواتساب (Contact)، وإرسال طلب السلة (Lead)
-(function(){ if(!window.SD_PATHS) return;
-  !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
-  fbq('init','1693857319024460'); fbq('track','PageView');
-  window.sdTrack=function(ev,p){ try{ fbq('track',ev,p||{}); }catch(e){} };
+// موافقة الكوكيز: Meta Pixel ما يشتغل إلا بعد "موافق". الاختيار ينحفظ في المتصفح، ويقدر الزائر يغيّره من "إعدادات الكوكيز" أسفل الصفحة
+(function(){ var V='2026-11-21', box=document.getElementById('ck');
+  function get(){ try{ var c=JSON.parse(localStorage.getItem('sd-consent')||'null'); return c&&c.v===V?c:null; }catch(e){ return null; } }
+  function pixel(){ if(!window.SD_PATHS||window.fbq) return;
+    !function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');
+    fbq('init','1693857319024460'); fbq('track','PageView');
+  }
+  // Meta Pixel: نسجّل زيارة الصفحة، وضغطة الواتساب (Contact)، وإرسال طلب السلة (Lead) — بعد الموافقة بس
+  window.sdTrack=function(ev,p){ try{ if(window.fbq) fbq('track',ev,p||{}); }catch(e){} };
   document.addEventListener('click',function(e){ var a=e.target&&e.target.closest&&e.target.closest('a[href*="wa.me"]'); if(a) sdTrack('Contact'); },true);
+  function choose(c){ var id=''; try{ id=(crypto.getRandomValues(new Uint32Array(2))).join('').slice(0,16); localStorage.setItem('sd-consent',JSON.stringify({c:c,v:V,at:new Date().toISOString()})); }catch(e){}
+    try{ navigator.sendBeacon('/api/legal/consent',new Blob([JSON.stringify({c:c,id:id})],{type:'application/json'})); }catch(e){}
+    box.hidden=true; if(c==='all') pixel(); else if(window.fbq){ try{ fbq('consent','revoke'); }catch(e){} } }
+  box.addEventListener('click',function(e){ var b=e.target.closest('[data-ck]'); if(b) choose(b.getAttribute('data-ck')); });
+  document.addEventListener('click',function(e){ var b=e.target.closest&&e.target.closest('[data-cookies]'); if(b){ e.preventDefault(); box.hidden=false; } });
+  var c=get(), again=/[?&]cookies=1/.test(location.search);
+  if(c&&c.c==='all') pixel();
+  if(!c||again) setTimeout(function(){ box.hidden=false; }, again?0:1200);
 })();
 </script>
 <div id="ld" aria-hidden="true"><div class="in">
@@ -1921,7 +1941,7 @@ html.ld-skip #ld{display:none}
       <div><h3>المساعدة</h3><button class="fh" type="button" aria-expanded="false">المساعدة</button><ul><li><a href="#faq">الأسئلة الشائعة</a></li><li><a data-book href="#book">احجز استشارة مجانية</a></li><li><a data-wa="help" href="#">كلم مختص</a></li><li><a href="#faq">طريقة الدفع</a></li></ul></div>
       <div><h3>تواصل</h3><button class="fh" type="button" aria-expanded="false">تواصل</button><ul><li><a data-wa="help" href="#">واتساب <span class="mono" data-phone></span></a></li><li>جدة، المملكة العربية السعودية</li></ul></div>
     </div>
-    <div class="fbar"><span>حقوق النشر © <span id="yr"></span> شاهين. جميع الحقوق محفوظة.</span><ul><li><a href="#faq">الأسئلة الشائعة</a></li><li><a href="#license">التوثيق</a></li><li><a data-wa="help" href="#">تواصل</a></li></ul><span>المملكة العربية السعودية</span></div>
+    <div class="fbar"><span>حقوق النشر © <span id="yr"></span> شاهين. جميع الحقوق محفوظة.</span><ul><li><a href="/privacy">الخصوصية</a></li><li><a href="/terms">الشروط</a></li><li><a href="/refund">الاسترداد</a></li><li><a href="/delivery">تنفيذ الخدمة</a></li><li><a href="/complaints">الشكاوى</a></li><li><a href="#" data-cookies>إعدادات الكوكيز</a></li></ul><span>المملكة العربية السعودية</span></div>
   </div>
 </footer>
 

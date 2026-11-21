@@ -234,7 +234,7 @@
       '<hr class="rule"><table><thead><tr><th>البيان</th><th class="num">المبلغ</th></tr></thead><tbody>' + (inv.lines || []).map(function (l) { return '<tr><td>' + E(l.desc) + '<div class="tiny muted">shaheendesign.sa/s/' + E(inv.slug) + '</div></td><td class="num">' + sar(l.amount) + '</td></tr>'; }).join('') +
       (inv.vat ? '<tr><td class="muted">المبلغ قبل الضريبة</td><td class="num">' + sar(inv.net) + '</td></tr><tr><td class="muted">ضريبة القيمة المضافة ١٥٪</td><td class="num">' + sar(inv.vat) + '</td></tr>' : '') + '</tbody></table>' +
       '<div class="tot"><span class="stamp ' + (inv.test ? 'test' : '') + '">' + ic(inv.test ? 'alert' : 'check', 16, 2.4) + (inv.test ? 'تجريبية' : 'مدفوعة') + '</span><div style="text-align:end"><div class="tiny muted">الإجمالي</div><b class="num">' + sar(inv.total) + '<small>ر.س</small></b></div></div>' +
-      '<p class="tiny muted" style="margin-top:18px">' + (inv.vatNo ? 'الأسعار شاملة ضريبة القيمة المضافة.' : 'المنشأة غير مسجّلة في ضريبة القيمة المضافة.') + (inv.payRef ? ' مرجع الدفع: <span class="ltr">' + E(String(inv.payRef).slice(0, 18)) + '</span>' : '') + '</p></div>' +
+      (inv.zatca ? '<div style="width:132px;margin:18px auto 0" aria-label="رمز الفاتورة الضريبية">' + qr(inv.zatca) + '</div>' : '') + '<p class="tiny muted" style="margin-top:18px">' + (inv.vatNo ? 'الأسعار شاملة ضريبة القيمة المضافة.' : 'المنشأة غير مسجّلة في ضريبة القيمة المضافة.') + (inv.payRef ? ' مرجع الدفع: <span class="ltr">' + E(String(inv.payRef).slice(0, 18)) + '</span>' : '') + '</p></div>' +
       '<div class="col noprint" style="margin-top:22px"><button class="btn" data-x="print">' + ic('share', 18) + 'حفظ أو مشاركة الفاتورة</button><a class="btn ghost" href="#billing">رجوع للفوترة</a></div>';
   }
 
