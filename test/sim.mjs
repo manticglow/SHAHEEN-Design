@@ -218,6 +218,41 @@ await test('ice breaker texts jump straight to the right section', async () => {
   assert.equal(d[0].interactive.action.sections[0].rows[0].id, 'cat_ready');
 });
 
+await test('works, faq and slash commands answer from anywhere', async () => {
+  const ctx = makeEnv(); const c = '966510000301';
+  await say(ctx, c, text('هلا'));
+  const w = await say(ctx, c, list('works'));
+  assert.match(bodyOf(w[0]), /BURGHAN/); assert.ok(bodyOf(w[0]).length <= 1024);
+  const f = await say(ctx, c, btn('faq'));
+  const rows = f[0].interactive.action.sections[0].rows;
+  assert.ok(rows.length >= 3 && rows.length <= 10 && rows.every((r) => [...r.title].length <= 24));
+  const a = await say(ctx, c, list(rows[0].id));
+  assert.match(bodyOf(a[0]), /كم التكلفة/);
+  const cmd = await say(ctx, c, text('/أعمالنا'));
+  assert.match(bodyOf(cmd[0]), /اشتغلنا معها/);
+  const m = await say(ctx, c, text('/خدمات'));
+  assert.equal(m[0].interactive.action.sections[0].rows[0].id, 'cat_ready');
+});
+
+await test('free consultation can be booked inside WhatsApp and the slot is taken', async () => {
+  const ctx = makeEnv(); const c = '966510000302';
+  await say(ctx, c, text('هلا'));
+  const ask = await say(ctx, c, list('book'));
+  assert.match(bodyOf(ask[0]), /اسمك/);
+  const sl = await say(ctx, c, text('سارة'));
+  const rows = sl[0].interactive.action.sections[0].rows;
+  assert.ok(rows.length > 0 && rows.length <= 10 && rows[0].id.startsWith('slot_'));
+  const done = await say(ctx, c, list(rows[0].id));
+  assert.match(bodyOf(done[0]), /تم حجز استشارتك/);
+  const lead = JSON.parse(await ctx.env.BOT_KV.get(`lead:${bodyOf(done[0]).match(/SD-[\w-]+/)[0]}`));
+  assert.equal(lead.kind, 'booking'); assert.equal(lead.wa, c); assert.equal(lead.name, 'سارة');
+  // نفس الوقت ما ينحجز مرتين
+  const c2 = '966510000303';
+  await say(ctx, c2, text('هلا')); await say(ctx, c2, list('book')); await say(ctx, c2, text('نورة'));
+  const again = await say(ctx, c2, list(rows[0].id));
+  assert.match(bodyOf(again[0]), /انحجز/);
+});
+
 await test('separate-number mode gives the client a link to the owner', async () => {
   const ctx = makeEnv({ MODE: 'separate' }); const c = '966510000000';
   await say(ctx, c, text('هلا')); await say(ctx, c, list('human'));
