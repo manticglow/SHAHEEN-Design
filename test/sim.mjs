@@ -206,6 +206,18 @@ await test('welcome menu lists ready-made systems and they can be picked', async
   assert.ok(ids.length <= 10);
 });
 
+await test('ice breaker texts jump straight to the right section', async () => {
+  const ctx = makeEnv();
+  const a = await say(ctx, '966510000201', text('أبغى نظام جاهز لنشاطي'));
+  assert.ok(a[0].interactive.action.sections[0].rows.some((r) => r.id === 'svc_wallet'));
+  const b = await say(ctx, '966510000202', text('أبغى موقع أو متجر'));
+  assert.ok(b[0].interactive.action.sections[0].rows.some((r) => r.id === 'svc_website'));
+  const c = await say(ctx, '966510000203', text('أتابع طلب سابق'));
+  assert.match(bodyOf(c[0]), /رقم طلبك/);
+  const d = await say(ctx, '966510000204', text('وش خدماتكم؟'));
+  assert.equal(d[0].interactive.action.sections[0].rows[0].id, 'cat_ready');
+});
+
 await test('separate-number mode gives the client a link to the owner', async () => {
   const ctx = makeEnv({ MODE: 'separate' }); const c = '966510000000';
   await say(ctx, c, text('هلا')); await say(ctx, c, list('human'));
