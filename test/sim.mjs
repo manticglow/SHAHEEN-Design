@@ -230,7 +230,9 @@ await test('works, faq and slash commands answer from anywhere', async () => {
   assert.match(bodyOf(a[0]), /كم التكلفة/);
   const cmd = await say(ctx, c, text('/أعمالنا'));
   assert.match(bodyOf(cmd[0]), /اشتغلنا معها/);
-  const m = await say(ctx, c, text('/خدمات'));
+  const e = await say(ctx, c, text('/works'));
+  assert.match(bodyOf(e[0]), /اشتغلنا معها/);
+  const m = await say(ctx, c, text('/services'));
   assert.equal(m[0].interactive.action.sections[0].rows[0].id, 'cat_ready');
 });
 
