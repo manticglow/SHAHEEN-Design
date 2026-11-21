@@ -198,7 +198,11 @@ await test('alert via template when admin window is closed', async () => {
 await test('separate-number mode gives the client a link to the owner', async () => {
   const ctx = makeEnv({ MODE: 'separate' }); const c = '966510000000';
   await say(ctx, c, text('هلا')); await say(ctx, c, list('human'));
-  const out = await say(ctx, c, text('فهد')); assert.match(bodyOf(out[0]), /wa\.me\/966582409776\?text=/);
+  const out = await say(ctx, c, text('فهد'));
+  assert.equal(out[0].interactive.type, 'cta_url');
+  assert.match(out[0].interactive.action.parameters.url, /wa\.me\/966582409776\?text=/);
+  assert.ok(out[0].interactive.action.parameters.display_text.length <= 20);
+  assert.doesNotMatch(bodyOf(out[0]), /https?:/); // الرابط في الزر مو في النص
 });
 
 await test('outside working hours the client is told when to expect a reply', async () => {
